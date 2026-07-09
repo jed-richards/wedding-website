@@ -1,0 +1,4 @@
+# Local Supabase secrets for `pnpm dev` (see README "Local development"). Copy this to
+# `.dev.vars` and fill in the values printed by `supabase start`.
+SUPABASE_SERVICE_ROLE_KEY=
+ADMIN_PASSWORD=
