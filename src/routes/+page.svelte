@@ -11,7 +11,7 @@
 </script>
 
 <svelte:head>
-  <title>Jed & Kenadie</title>
+  <title>Kenadie & Jed</title>
 </svelte:head>
 
 <section class="flex flex-col items-center gap-6 py-12 text-center sm:py-20">
@@ -19,7 +19,7 @@
     We're getting married
   </p>
 
-  <h1 class="font-heading text-4xl text-primary sm:text-6xl">Jed &amp; Kenadie</h1>
+  <h1 class="font-heading text-4xl text-primary sm:text-6xl">Kenadie &amp; Jed</h1>
 
   <div class="flex flex-col gap-1 font-body text-text">
     <p>{formattedDate}</p>
