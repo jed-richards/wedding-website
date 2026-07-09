@@ -1,3 +1,15 @@
+<script lang="ts">
+  import Countdown from "$lib/components/Countdown.svelte";
+  import { WEDDING_DATE } from "$lib/wedding";
+
+  const formattedDate = WEDDING_DATE.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+</script>
+
 <svelte:head>
   <title>Jed & Kenadie</title>
 </svelte:head>
@@ -10,15 +22,14 @@
   <h1 class="font-heading text-4xl text-primary sm:text-6xl">Jed &amp; Kenadie</h1>
 
   <div class="flex flex-col gap-1 font-body text-text">
-    <p>
-      <!-- TODO: set real wedding date -->
-      Date to be announced
-    </p>
+    <p>{formattedDate}</p>
     <p class="text-text-muted">
       <!-- TODO: set real venue -->
       Venue to be announced
     </p>
   </div>
+
+  <Countdown />
 
   <a
     href="/rsvp"
