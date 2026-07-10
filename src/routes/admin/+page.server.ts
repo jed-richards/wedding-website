@@ -1,11 +1,6 @@
-import { fail } from "@sveltejs/kit";
-import { createServiceClient } from "$lib/server/supabase";
-import {
-  isAdmin,
-  setAdminSession,
-  clearAdminSession,
-  verifyAdminPassword,
-} from "$lib/server/auth";
+import { fail, redirect } from "@sveltejs/kit";
+import { createAuthClient, createServiceClient } from "$lib/server/supabase";
+import { getAdminSession, requireAdminEmail } from "$lib/server/auth";
 import type { Actions, PageServerLoad } from "./$types";
 
 async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
@@ -33,37 +28,44 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
 
 export const load: PageServerLoad = async ({ cookies, platform }) => {
   const env = platform!.env;
-  if (!(await isAdmin(cookies, env))) {
-    return { authed: false as const };
+  const session = await getAdminSession(cookies, env);
+  if (session.status !== "authed") {
+    return {
+      authed: false as const,
+      notAuthorized: session.status === "not_authorized",
+    };
   }
 
   const supabase = createServiceClient(env);
   const dashboard = await loadDashboard(supabase);
-  return { authed: true as const, ...dashboard };
+  return { authed: true as const, email: session.email, ...dashboard };
 };
 
 export const actions: Actions = {
-  login: async ({ request, cookies, platform }) => {
-    const env = platform!.env;
-    const formData = await request.formData();
-    const password = String(formData.get("password") ?? "");
+  login: async ({ url, cookies }) => {
+    const supabaseAuth = createAuthClient(cookies);
+    const { data, error } = await supabaseAuth.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${url.origin}/admin/auth/callback` },
+    });
 
-    if (!(await verifyAdminPassword(env, password))) {
-      return fail(401, { error: "Incorrect password." });
+    if (error || !data.url) {
+      return fail(500, { error: "Could not start Google sign-in." });
     }
 
-    await setAdminSession(cookies, env);
-    return { loggedIn: true };
+    throw redirect(303, data.url);
   },
 
   logout: async ({ cookies }) => {
-    clearAdminSession(cookies);
+    const supabaseAuth = createAuthClient(cookies);
+    await supabaseAuth.auth.signOut();
     return { loggedOut: true };
   },
 
   createParty: async ({ request, cookies, platform }) => {
     const env = platform!.env;
-    if (!(await isAdmin(cookies, env))) return fail(401, { error: "Not signed in." });
+    if (!(await requireAdminEmail(cookies, env)))
+      return fail(401, { error: "Not signed in." });
 
     const formData = await request.formData();
     const partyName = String(formData.get("party_name") ?? "").trim();
@@ -88,7 +90,8 @@ export const actions: Actions = {
 
   deleteParty: async ({ request, cookies, platform }) => {
     const env = platform!.env;
-    if (!(await isAdmin(cookies, env))) return fail(401, { error: "Not signed in." });
+    if (!(await requireAdminEmail(cookies, env)))
+      return fail(401, { error: "Not signed in." });
 
     const formData = await request.formData();
     const partyId = String(formData.get("party_id") ?? "");
@@ -103,7 +106,8 @@ export const actions: Actions = {
 
   createGuest: async ({ request, cookies, platform }) => {
     const env = platform!.env;
-    if (!(await isAdmin(cookies, env))) return fail(401, { error: "Not signed in." });
+    if (!(await requireAdminEmail(cookies, env)))
+      return fail(401, { error: "Not signed in." });
 
     const formData = await request.formData();
     const partyId = String(formData.get("party_id") ?? "");
@@ -124,7 +128,8 @@ export const actions: Actions = {
 
   deleteGuest: async ({ request, cookies, platform }) => {
     const env = platform!.env;
-    if (!(await isAdmin(cookies, env))) return fail(401, { error: "Not signed in." });
+    if (!(await requireAdminEmail(cookies, env)))
+      return fail(401, { error: "Not signed in." });
 
     const formData = await request.formData();
     const guestId = String(formData.get("guest_id") ?? "");

@@ -43,8 +43,7 @@ schema experiments and test data can't touch real guest data.
      copy them straight from the `supabase start` output.
    - `.dev.vars` — copy `.dev.vars.example` to `.dev.vars` and fill in
      `SUPABASE_SERVICE_ROLE_KEY` from `supabase start` (wrangler's local platform proxy
-     reads this before falling back to `.env`). Set `ADMIN_PASSWORD` to whatever you want
-     locally.
+     reads this before falling back to `.env`).
 4. Start the dev server:
    ```sh
    pnpm run dev
@@ -62,20 +61,48 @@ docker compose -p supabase_wedding-website logs -f
 - `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` — public, safe to expose to the
   browser.
 - `SUPABASE_SERVICE_ROLE_KEY` — **secret**, server-only. From the Supabase dashboard:
-  Project Settings > API > service_role secret. Used to read/write `parties`/`guests` from
-  `/rsvp` and `/admin` server code, bypassing RLS. Never import this from a `.svelte` file
-  or anywhere the browser can reach.
-- `ADMIN_PASSWORD` — **secret**, the shared password for `/admin`.
+  Project Settings > API > service_role secret. Used to read/write `parties`/`guests`/
+  `admin_users` from `/rsvp` and `/admin` server code, bypassing RLS. Never import this
+  from a `.svelte` file or anywhere the browser can reach.
 
 After changing `.env`, run `pnpm run typegen` to regenerate `worker-configuration.d.ts` so
 the new vars are typed on `Env`.
 
-For production, set the two secrets with `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`
-and `wrangler secret put ADMIN_PASSWORD` — don't rely on `wrangler.jsonc` vars for these.
+For production, set the secret with `wrangler secret put SUPABASE_SERVICE_ROLE_KEY` —
+don't rely on `wrangler.jsonc` vars for it.
 
 > Note: the anon/publishable key must never be granted table access to `parties` or
 > `guests` (RLS is currently off on those tables specifically because only the
 > service-role key touches them, server-side).
+
+## Admin access (`/admin`)
+
+`/admin` uses Supabase Auth's Google sign-in instead of a shared password. Access is
+controlled two ways:
+
+1. **Supabase Auth > Providers > Google** must be enabled in the
+   [Supabase dashboard](https://supabase.com/dashboard/project/embaqmcpelpqfrbsgxfi),
+   with a Google OAuth client ID/secret from the
+   [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   (authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`).
+   This is dashboard/console configuration, not something in this repo.
+2. The signed-in Google account's email must exist in the `admin_users` table
+   (see `supabase/migrations/20260710120000_create_admin_users.sql`). Add or remove admins
+   by editing that table directly in the Supabase dashboard's SQL editor or Table editor —
+   no redeploy needed:
+   ```sql
+   insert into admin_users (email) values ('someone@gmail.com');
+   delete from admin_users where email = 'someone@gmail.com';
+   ```
+
+Signing in with a Google account that isn't in `admin_users` immediately signs the account
+back out and shows a "not authorized" message on `/admin`.
+
+To test Google sign-in against the **local** Supabase stack, configure
+`[auth.external.google]` in `supabase/config.toml` with a Google OAuth client registered
+for `http://127.0.0.1:54321/auth/v1/callback`, and set
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`/`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` before
+running `supabase start`. Otherwise, just test against production/staging Supabase.
 
 ## Building
 

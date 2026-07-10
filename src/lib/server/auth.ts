@@ -1,53 +1,51 @@
-/** Shared helpers for the /admin password gate. Not a general-purpose auth system —
- * there's a single shared admin password, no per-user accounts. */
+/** Shared helpers for the /admin Google sign-in gate. Access is granted per Google
+ * account: Supabase Auth verifies the Google sign-in, then we check the signed-in
+ * email against the `admin_users` allowlist table before treating the request as
+ * authenticated. */
 
-const ADMIN_SESSION_COOKIE = "admin_session";
+import type { Cookies } from "@sveltejs/kit";
+import { createAuthClient, createServiceClient } from "./supabase";
 
-async function sha256Hex(input: string) {
-  const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+type AdminSession =
+  | { status: "authed"; email: string }
+  | { status: "not_authorized" }
+  | { status: "signed_out" };
+
+async function isAllowedEmail(env: Env, email: string) {
+  const supabase = createServiceClient(env);
+  const { data } = await supabase
+    .from("admin_users")
+    .select("email")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+  return data !== null;
 }
 
-/** Deterministic token derived from the admin password, so we don't need a sessions
- * table: anyone who can compute this already knows the password. */
-async function adminSessionToken(env: Env) {
-  return sha256Hex(`${env.ADMIN_PASSWORD}:admin-session`);
-}
-
-function timingSafeEqual(a: string, b: string) {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
-export async function verifyAdminPassword(env: Env, password: string) {
-  return timingSafeEqual(password, env.ADMIN_PASSWORD);
-}
-
-export async function setAdminSession(
-  cookies: import("@sveltejs/kit").Cookies,
+/** Resolves the current /admin session from the Supabase Auth cookie. A Google
+ * account that isn't on the `admin_users` allowlist is reported as
+ * "not_authorized" (and signed back out), distinct from never having signed in
+ * at all, so the UI can explain why access was denied. */
+export async function getAdminSession(
+  cookies: Cookies,
   env: Env,
-) {
-  cookies.set(ADMIN_SESSION_COOKIE, await adminSessionToken(env), {
-    path: "/admin",
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+): Promise<AdminSession> {
+  const supabaseAuth = createAuthClient(cookies);
+  const {
+    data: { user },
+  } = await supabaseAuth.auth.getUser();
+  if (!user?.email) return { status: "signed_out" };
+
+  if (!(await isAllowedEmail(env, user.email))) {
+    await supabaseAuth.auth.signOut();
+    return { status: "not_authorized" };
+  }
+
+  return { status: "authed", email: user.email };
 }
 
-export function clearAdminSession(cookies: import("@sveltejs/kit").Cookies) {
-  cookies.delete(ADMIN_SESSION_COOKIE, { path: "/admin" });
-}
-
-export async function isAdmin(cookies: import("@sveltejs/kit").Cookies, env: Env) {
-  const cookie = cookies.get(ADMIN_SESSION_COOKIE);
-  if (!cookie) return false;
-  return timingSafeEqual(cookie, await adminSessionToken(env));
+/** Returns the signed-in admin's email, or null if they're not authenticated —
+ * for the form actions that just need to gate a write, not explain why. */
+export async function requireAdminEmail(cookies: Cookies, env: Env) {
+  const session = await getAdminSession(cookies, env);
+  return session.status === "authed" ? session.email : null;
 }
