@@ -9,6 +9,6 @@ create table admin_users (
 
 grant select, insert, update, delete on public.admin_users to service_role;
 
--- Seed the initial admin. Add the rest (Kennedy, etc.) via the Supabase dashboard
+-- Seed the initial admin. Add the rest (Kenadie, etc.) via the Supabase dashboard
 -- SQL editor: insert into admin_users (email) values ('someone@gmail.com');
 insert into admin_users (email) values ('jed22richards@gmail.com');
