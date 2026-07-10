@@ -10,6 +10,7 @@
   },
   "workers_dev": true,
   "preview_urls": true,
+  "routes": [{ "pattern": "kenadieandjed.com", "custom_domain": true }],
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,

@@ -8,7 +8,7 @@ SvelteKit site deployed to Cloudflare Workers, backed by Supabase (Postgres). Bu
 
 - [Supabase dashboard](https://supabase.com/dashboard/project/embaqmcpelpqfrbsgxfi)
 - [Cloudflare Workers dashboard](https://dash.cloudflare.com/8593014c2a1be8c627b4391c599232e2/workers/services/view/wedding-website/production)
-- [Production site](https://wedding-website.jed22richards.workers.dev/)
+- [Production site](https://kenadieandjed.com/)
 
 ## Prerequisites
 
