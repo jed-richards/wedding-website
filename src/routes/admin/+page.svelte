@@ -109,6 +109,48 @@
       {/if}
     </section>
 
+    <section class="mb-10">
+      <h2 class="mb-3 text-lg font-medium">Import guests from CSV</h2>
+      <p class="mb-3 text-sm text-gray-500">
+        Columns: <code>party_name</code>, <code>passcode</code>,
+        <code>first_name</code>, <code>last_name</code>. One row per guest — rows that
+        share a party name and passcode become one party.
+      </p>
+      <form
+        method="POST"
+        action="?/importCsv"
+        enctype="multipart/form-data"
+        use:enhance
+        class="flex flex-wrap items-end gap-3"
+      >
+        <input
+          type="file"
+          name="csv_file"
+          accept=".csv,text/csv"
+          required
+          class="text-sm"
+        />
+        <button
+          type="submit"
+          class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
+        >
+          Import
+        </button>
+      </form>
+      {#if form?.csvImported}
+        <p class="mt-2 text-sm text-green-700">
+          Imported {form.partiesCreated} part{form.partiesCreated === 1 ? "y" : "ies"}
+          and {form.guestsCreated} guest{form.guestsCreated === 1 ? "" : "s"}.
+        </p>
+      {:else if form?.csvError}
+        <div class="mt-2 text-sm text-red-600">
+          {#each form.csvError.split("\n") as line (line)}
+            <p>{line}</p>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
     <section class="flex flex-col gap-8">
       {#each data.parties as party (party.id)}
         <div class="rounded-md border border-gray-200 p-4">
