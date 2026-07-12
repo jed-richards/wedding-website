@@ -16,12 +16,12 @@
 
   {#if !data.session}
     <p class="mb-6 text-gray-600">
-      Enter your family name as shown on your invitation to RSVP.
+      Enter your party name as shown on your invitation to RSVP.
     </p>
 
     <form method="POST" action="?/verify" use:enhance class="flex flex-col gap-4">
       <label class="flex flex-col gap-1">
-        <span class="text-sm font-medium">Family name</span>
+        <span class="text-sm font-medium">Party name</span>
         <input
           type="text"
           name="party_name"

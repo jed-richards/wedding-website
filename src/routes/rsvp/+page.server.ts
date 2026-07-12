@@ -45,7 +45,7 @@ export const actions: Actions = {
     const formData = await request.formData();
     const partyName = String(formData.get("party_name") ?? "").trim();
     if (!partyName) {
-      return fail(400, { error: "Enter your family name." });
+      return fail(400, { error: "Enter your party name." });
     }
 
     const supabase = createServiceClient(platform!.env);
@@ -75,7 +75,7 @@ export const actions: Actions = {
     const partyId = cookies.get(PARTY_COOKIE);
     if (!partyId) {
       return fail(401, {
-        error: "Your session expired. Please enter your family name again.",
+        error: "Your session expired. Please enter your party name again.",
       });
     }
 
@@ -89,7 +89,7 @@ export const actions: Actions = {
     const validGuestIds = new Set((partyGuests ?? []).map((g) => g.id));
     if (validGuestIds.size === 0) {
       return fail(401, {
-        error: "Your session expired. Please enter your family name again.",
+        error: "Your session expired. Please enter your party name again.",
       });
     }
 
