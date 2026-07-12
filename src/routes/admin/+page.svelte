@@ -88,15 +88,6 @@
             class="rounded-md border-gray-300"
           />
         </label>
-        <label class="flex flex-col gap-1">
-          <span class="text-sm font-medium">Passcode</span>
-          <input
-            type="text"
-            name="passcode"
-            required
-            class="rounded-md border-gray-300"
-          />
-        </label>
         <button
           type="submit"
           class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
@@ -115,7 +106,6 @@
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-lg font-medium">{party.party_name}</h3>
             <div class="flex items-center gap-3 text-sm text-gray-500">
-              <span>Passcode: {party.passcode}</span>
               <form method="POST" action="?/deleteParty" use:enhance>
                 <input type="hidden" name="party_id" value={party.id} />
                 <button type="submit" class="text-red-600 hover:underline"
