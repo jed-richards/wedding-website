@@ -19,39 +19,33 @@
   <h1 class="mb-6 text-3xl font-semibold">Admin</h1>
 
   {#if !data.authed}
-    <form
-      method="POST"
-      action="?/login"
-      use:enhance
-      class="flex max-w-xs flex-col gap-4"
-    >
-      <label class="flex flex-col gap-1">
-        <span class="text-sm font-medium">Password</span>
-        <input
-          type="password"
-          name="password"
-          required
-          class="rounded-md border-gray-300"
-        />
-      </label>
+    {#if data.notAuthorized}
+      <p class="mb-4 text-sm text-red-600">
+        That Google account isn't authorized for admin access.
+      </p>
+    {/if}
 
+    <form method="POST" action="?/login" class="max-w-xs">
       {#if form?.error}
-        <p class="text-sm text-red-600">{form.error}</p>
+        <p class="mb-2 text-sm text-red-600">{form.error}</p>
       {/if}
 
       <button
         type="submit"
         class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
       >
-        Sign in
+        Sign in with Google
       </button>
     </form>
   {:else}
-    <form method="POST" action="?/logout" use:enhance class="mb-8">
-      <button type="submit" class="text-sm text-gray-500 hover:underline"
-        >Sign out</button
-      >
-    </form>
+    <div class="mb-8 flex items-center gap-3">
+      <p class="text-sm text-gray-500">Signed in as {data.email}</p>
+      <form method="POST" action="?/logout" use:enhance>
+        <button type="submit" class="text-sm text-gray-500 hover:underline"
+          >Sign out</button
+        >
+      </form>
+    </div>
 
     <section class="mb-10 rounded-md border border-gray-200 p-4">
       <h2 class="mb-3 text-lg font-medium">Summary</h2>
