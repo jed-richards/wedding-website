@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ cookies, platform }) => {
   const supabase = createServiceClient(platform!.env);
   const session = await loadParty(supabase, partyId);
   if (!session) {
-    // Stale/invalid cookie (party deleted, etc) — fall back to the passcode gate.
+    // Stale/invalid cookie (party deleted, etc) — fall back to the name gate.
     cookies.delete(PARTY_COOKIE, { path: "/rsvp" });
     return { session: null, mealOptions: MEAL_OPTIONS };
   }
@@ -43,21 +43,21 @@ export const load: PageServerLoad = async ({ cookies, platform }) => {
 export const actions: Actions = {
   verify: async ({ request, cookies, platform }) => {
     const formData = await request.formData();
-    const passcode = String(formData.get("passcode") ?? "").trim();
-    if (!passcode) {
-      return fail(400, { error: "Enter your passcode." });
+    const partyName = String(formData.get("party_name") ?? "").trim();
+    if (!partyName) {
+      return fail(400, { error: "Enter your party name." });
     }
 
     const supabase = createServiceClient(platform!.env);
     const { data: party } = await supabase
       .from("parties")
       .select("id")
-      .ilike("passcode", passcode)
+      .ilike("party_name", partyName)
       .maybeSingle();
 
     if (!party) {
       return fail(401, {
-        error: "We couldn't find that passcode. Please double-check and try again.",
+        error: "We couldn't find that name. Please double-check and try again.",
       });
     }
 
@@ -75,7 +75,7 @@ export const actions: Actions = {
     const partyId = cookies.get(PARTY_COOKIE);
     if (!partyId) {
       return fail(401, {
-        error: "Your session expired. Please enter your passcode again.",
+        error: "Your session expired. Please enter your party name again.",
       });
     }
 
@@ -89,7 +89,7 @@ export const actions: Actions = {
     const validGuestIds = new Set((partyGuests ?? []).map((g) => g.id));
     if (validGuestIds.size === 0) {
       return fail(401, {
-        error: "Your session expired. Please enter your passcode again.",
+        error: "Your session expired. Please enter your party name again.",
       });
     }
 

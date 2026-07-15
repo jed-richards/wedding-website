@@ -12,7 +12,7 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
     .from("parties")
     .select(
-      "id, party_name, passcode, guests(id, first_name, last_name, is_attending, meal_choice, dietary_notes)",
+      "id, party_name, guests(id, first_name, last_name, is_attending, meal_choice, dietary_notes)",
     )
     .order("party_name");
 
@@ -67,16 +67,21 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const partyName = String(formData.get("party_name") ?? "").trim();
-    const passcode = String(formData.get("passcode") ?? "").trim();
-    if (!partyName || !passcode) {
-      return fail(400, { error: "Party name and passcode are required." });
+    if (!partyName) {
+      return fail(400, { error: "Party name is required." });
     }
 
     const supabase = createServiceClient(env);
-    const { error } = await supabase
-      .from("parties")
-      .insert({ party_name: partyName, passcode });
-    if (error) return fail(500, { error: "Could not create party." });
+    const { error } = await supabase.from("parties").insert({ party_name: partyName });
+    if (error) {
+      if (error.code === "23505") {
+        return fail(400, {
+          error:
+            "A party with that name already exists. Add a last initial or similar to tell them apart (e.g. \"The Smiths - J\").",
+        });
+      }
+      return fail(500, { error: "Could not create party." });
+    }
 
     return { partyCreated: true };
   },
