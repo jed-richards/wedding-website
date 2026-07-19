@@ -94,6 +94,58 @@
       {/if}
     </section>
 
+    <section class="mb-10">
+      <h2 class="mb-3 text-lg font-medium">Bulk import from JSON</h2>
+      <p class="mb-3 max-w-2xl text-sm text-gray-600">
+        Upload a JSON file to create many parties and guests at once. It must be an
+        array of parties, each with a <code>party_name</code> and a non-empty
+        <code>guests</code> array of <code>first_name</code> /
+        <code>last_name</code> objects. Party names must be unique and not already in use.
+      </p>
+      <form
+        method="POST"
+        action="?/importJson"
+        enctype="multipart/form-data"
+        use:enhance
+        class="flex flex-wrap items-end gap-3"
+      >
+        <label class="flex flex-col gap-1">
+          <span class="text-sm font-medium">JSON file</span>
+          <input
+            type="file"
+            name="file"
+            accept="application/json,.json"
+            required
+            class="text-sm"
+          />
+        </label>
+        <button
+          type="submit"
+          class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
+        >
+          Import
+        </button>
+      </form>
+      {#if form?.imported}
+        <p class="mt-2 text-sm text-green-700">
+          Imported {form.imported.parties}
+          {form.imported.parties === 1 ? "party" : "parties"} and
+          {form.imported.guests}
+          {form.imported.guests === 1 ? "guest" : "guests"}.
+        </p>
+      {/if}
+      {#if form?.importErrors}
+        <div class="mt-2 text-sm text-red-600">
+          <p class="font-medium">Import failed — nothing was saved:</p>
+          <ul class="mt-1 list-inside list-disc">
+            {#each form.importErrors as error (error)}
+              <li>{error}</li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+    </section>
+
     <section class="flex flex-col gap-8">
       {#each data.parties as party (party.id)}
         <div class="rounded-md border border-gray-200 p-4">
