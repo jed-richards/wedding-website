@@ -1,6 +1,7 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { createAuthClient, createServiceClient } from "$lib/server/supabase";
 import { getAdminSession, requireAdminEmail } from "$lib/server/auth";
+import { MAX_IMPORT_BYTES, parseImport } from "$lib/server/importGuests";
 import type { Actions, PageServerLoad } from "./$types";
 
 async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
@@ -79,7 +80,7 @@ export const actions: Actions = {
       if (error.code === "23505") {
         return fail(400, {
           error:
-            "A party with that name already exists. Add a last initial or similar to tell them apart (e.g. \"The Smiths - J\").",
+            'A party with that name already exists. Add a last initial or similar to tell them apart (e.g. "The Smiths - J").',
         });
       }
       return fail(500, { error: "Could not create party." });
@@ -140,5 +141,105 @@ export const actions: Actions = {
     if (error) return fail(500, { error: "Could not delete guest." });
 
     return { guestDeleted: true };
+  },
+
+  importJson: async ({ request, cookies, platform }) => {
+    const env = platform!.env;
+    if (!(await requireAdminEmail(cookies, env)))
+      return fail(401, { importErrors: ["Not signed in."] });
+
+    const formData = await request.formData();
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      return fail(400, { importErrors: ["Choose a JSON file to import."] });
+    }
+    if (file.size > MAX_IMPORT_BYTES) {
+      return fail(400, {
+        importErrors: [
+          `File is too large (${(file.size / 1_000_000).toFixed(1)} MB); the maximum is ${MAX_IMPORT_BYTES / 1_000_000} MB.`,
+        ],
+      });
+    }
+
+    const parsed = parseImport(await file.text());
+    if (!parsed.ok) {
+      return fail(400, { importErrors: parsed.errors });
+    }
+
+    const supabase = createServiceClient(env);
+
+    // party_name is the unique, case-insensitive RSVP key, so reject any name
+    // already in the table before inserting. `.in()` is case-sensitive, so
+    // compare on lowercased names in memory instead.
+    const { data: existing, error: existingError } = await supabase
+      .from("parties")
+      .select("party_name");
+    if (existingError) {
+      return fail(500, { importErrors: ["Could not check existing parties."] });
+    }
+    const existingNames = new Set(
+      (existing ?? []).map((p) => p.party_name.toLowerCase()),
+    );
+    const duplicates = parsed.parties.filter((p) =>
+      existingNames.has(p.partyName.toLowerCase()),
+    );
+    if (duplicates.length > 0) {
+      return fail(400, {
+        importErrors: duplicates.map(
+          (p) =>
+            `Party "${p.partyName}" already exists — rename it or remove it from the file.`,
+        ),
+      });
+    }
+
+    // Two batched inserts (parties, then their guests) instead of a round trip
+    // per row. Postgres has no cross-statement transaction here, so if the guest
+    // insert fails we delete the just-created parties to avoid orphaned parties.
+    const { data: insertedParties, error: partyError } = await supabase
+      .from("parties")
+      .insert(parsed.parties.map((p) => ({ party_name: p.partyName })))
+      .select("id, party_name");
+    if (partyError || !insertedParties) {
+      if (partyError?.code === "23505") {
+        return fail(400, {
+          importErrors: [
+            "A party name collided during import (created elsewhere just now). Re-check for duplicates and try again.",
+          ],
+        });
+      }
+      return fail(500, { importErrors: ["Could not import parties."] });
+    }
+
+    const idByName = new Map(
+      insertedParties.map((p) => [p.party_name.toLowerCase(), p.id]),
+    );
+    const guestRows = parsed.parties.flatMap((party) =>
+      party.guests.map((guest) => ({
+        party_id: idByName.get(party.partyName.toLowerCase())!,
+        first_name: guest.firstName,
+        last_name: guest.lastName,
+      })),
+    );
+
+    const { error: guestError } = await supabase.from("guests").insert(guestRows);
+    if (guestError) {
+      await supabase
+        .from("parties")
+        .delete()
+        .in(
+          "id",
+          insertedParties.map((p) => p.id),
+        );
+      return fail(500, {
+        importErrors: ["Could not import guests; the import was rolled back."],
+      });
+    }
+
+    return {
+      imported: {
+        parties: insertedParties.length,
+        guests: guestRows.length,
+      },
+    };
   },
 };
