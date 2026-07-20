@@ -181,13 +181,13 @@ export const actions: Actions = {
       (existing ?? []).map((p) => p.party_name.toLowerCase()),
     );
     const duplicates = parsed.parties.filter((p) =>
-      existingNames.has(p.party_name.toLowerCase()),
+      existingNames.has(p.partyName.toLowerCase()),
     );
     if (duplicates.length > 0) {
       return fail(400, {
         importErrors: duplicates.map(
           (p) =>
-            `Party "${p.party_name}" already exists — rename it or remove it from the file.`,
+            `Party "${p.partyName}" already exists — rename it or remove it from the file.`,
         ),
       });
     }
@@ -197,7 +197,7 @@ export const actions: Actions = {
     // insert fails we delete the just-created parties to avoid orphaned parties.
     const { data: insertedParties, error: partyError } = await supabase
       .from("parties")
-      .insert(parsed.parties.map((p) => ({ party_name: p.party_name })))
+      .insert(parsed.parties.map((p) => ({ party_name: p.partyName })))
       .select("id, party_name");
     if (partyError || !insertedParties) {
       if (partyError?.code === "23505") {
@@ -215,9 +215,9 @@ export const actions: Actions = {
     );
     const guestRows = parsed.parties.flatMap((party) =>
       party.guests.map((guest) => ({
-        party_id: idByName.get(party.party_name.toLowerCase())!,
-        first_name: guest.first_name,
-        last_name: guest.last_name,
+        party_id: idByName.get(party.partyName.toLowerCase())!,
+        first_name: guest.firstName,
+        last_name: guest.lastName,
       })),
     );
 

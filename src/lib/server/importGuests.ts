@@ -2,15 +2,17 @@
  * any Supabase or request dependencies so the shape/validation rules are easy to
  * reason about (and test) in isolation from the form action that persists them. */
 
-/** A single guest as it appears in an uploaded import file, after trimming. */
+/** A single validated, trimmed guest. The uploaded file uses snake_case keys
+ * (`first_name`/`last_name`); those are read at parse time and normalised into
+ * this camelCase domain shape. */
 export interface ImportGuest {
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
 }
 
 /** One party plus its guests, validated and normalised from an import file. */
 export interface ImportParty {
-  party_name: string;
+  partyName: string;
   guests: ImportGuest[];
 }
 
@@ -92,7 +94,7 @@ export function parseImport(raw: string): ParseResult {
           );
           return;
         }
-        guests.push({ first_name: firstName, last_name: lastName });
+        guests.push({ firstName, lastName });
       });
     }
 
@@ -106,7 +108,7 @@ export function parseImport(raw: string): ParseResult {
     }
 
     if (partyName && guests.length > 0) {
-      parties.push({ party_name: partyName, guests });
+      parties.push({ partyName, guests });
     }
   });
 
