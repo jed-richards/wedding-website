@@ -8,10 +8,10 @@
   };
 
   const events: ScheduleEvent[] = [
-    { time: "3:00 PM", title: "Ceremony", detail: "Mahoney State Park" },
-    { time: "4:00 PM", title: "Cocktail Hour", detail: "Mahoney State Park" },
+    { time: "4:00 PM", title: "Ceremony", detail: "Mahoney State Park" },
+    { time: "5:00 PM", title: "Cocktail Hour", detail: "Mahoney State Park" },
     {
-      time: "6:00 PM",
+      time: "7:00 PM",
       title: "Reception & Dinner",
       detail: "Mahoney State Park",
       caterer: { name: "the Pancake Man", url: "https://www.pancakeman.net" },
