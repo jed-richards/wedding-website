@@ -1,9 +1,21 @@
 <script lang="ts">
-  // TODO: replace with real event times/locations once finalized
-  const events = [
-    { time: "3:00 PM", title: "Ceremony", detail: "Location TBD" },
-    { time: "4:00 PM", title: "Cocktail Hour", detail: "Location TBD" },
-    { time: "6:00 PM", title: "Reception", detail: "Location TBD" },
+  // TODO: confirm exact event times once finalized
+  type ScheduleEvent = {
+    time: string;
+    title: string;
+    detail: string;
+    caterer?: { name: string; url: string };
+  };
+
+  const events: ScheduleEvent[] = [
+    { time: "3:00 PM", title: "Ceremony", detail: "Mahoney State Park" },
+    { time: "4:00 PM", title: "Cocktail Hour", detail: "Mahoney State Park" },
+    {
+      time: "6:00 PM",
+      title: "Reception & Dinner",
+      detail: "Mahoney State Park",
+      caterer: { name: "the Pancake Man", url: "https://www.pancakeman.net" },
+    },
   ];
 </script>
 
@@ -28,7 +40,18 @@
         </span>
         <div class="font-body">
           <h2 class="text-text">{event.title}</h2>
-          <p class="text-sm text-text-muted">{event.detail}</p>
+          <p class="text-sm text-text-muted">
+            {event.detail}{#if event.caterer}
+              — catering by
+              <a
+                href={event.caterer.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary hover:text-accent hover:underline"
+              >
+                {event.caterer.name}
+              </a>{/if}
+          </p>
         </div>
       </li>
     {/each}

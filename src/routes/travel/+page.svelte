@@ -7,7 +7,7 @@
     },
     {
       title: "Getting There",
-      body: "The nearest airport is TBD. Directions and travel tips will be posted here.",
+      body: "The wedding is at Mahoney State Park. Directions and travel tips will be posted here.",
     },
     {
       title: "Parking",
