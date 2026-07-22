@@ -1,6 +1,5 @@
 import { fail } from "@sveltejs/kit";
 import { createServiceClient } from "$lib/server/supabase";
-import { MEAL_OPTIONS } from "$lib/meals";
 import type { Actions, PageServerLoad } from "./$types";
 
 const PARTY_COOKIE = "party_id";
@@ -18,7 +17,7 @@ async function loadParty(
 
   const { data: guests } = await supabase
     .from("guests")
-    .select("id, first_name, last_name, is_attending, meal_choice, dietary_notes")
+    .select("id, first_name, last_name, is_attending, dietary_notes")
     .eq("party_id", partyId)
     .order("first_name");
 
@@ -27,17 +26,17 @@ async function loadParty(
 
 export const load: PageServerLoad = async ({ cookies, platform }) => {
   const partyId = cookies.get(PARTY_COOKIE);
-  if (!partyId) return { session: null, mealOptions: MEAL_OPTIONS };
+  if (!partyId) return { session: null };
 
   const supabase = createServiceClient(platform!.env);
   const session = await loadParty(supabase, partyId);
   if (!session) {
     // Stale/invalid cookie (party deleted, etc) — fall back to the name gate.
     cookies.delete(PARTY_COOKIE, { path: "/rsvp" });
-    return { session: null, mealOptions: MEAL_OPTIONS };
+    return { session: null };
   }
 
-  return { session, mealOptions: MEAL_OPTIONS };
+  return { session };
 };
 
 export const actions: Actions = {
@@ -96,12 +95,10 @@ export const actions: Actions = {
     const formData = await request.formData();
     const updates = [...validGuestIds].map((guestId) => {
       const attending = formData.get(`attending_${guestId}`);
-      const meal = formData.get(`meal_${guestId}`);
       const notes = formData.get(`notes_${guestId}`);
       return {
         id: guestId,
         is_attending: attending === "yes" ? true : attending === "no" ? false : null,
-        meal_choice: attending === "yes" ? String(meal ?? "") || null : null,
         dietary_notes: attending === "yes" ? String(notes ?? "").trim() || null : null,
         updated_at: new Date().toISOString(),
       };
