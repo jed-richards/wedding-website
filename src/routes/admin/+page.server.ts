@@ -7,7 +7,7 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
     .from("parties")
     .select(
-      "id, party_name, guests(id, first_name, last_name, is_attending, meal_choice, dietary_notes)",
+      "id, party_name, guests(id, first_name, last_name, is_attending, dietary_notes)",
     )
     .order("party_name");
 
@@ -17,10 +17,6 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
     attending: allGuests.filter((g) => g.is_attending === true).length,
     notAttending: allGuests.filter((g) => g.is_attending === false).length,
     noResponse: allGuests.filter((g) => g.is_attending === null).length,
-    mealCounts: allGuests.reduce<Record<string, number>>((acc, g) => {
-      if (g.meal_choice) acc[g.meal_choice] = (acc[g.meal_choice] ?? 0) + 1;
-      return acc;
-    }, {}),
   };
 
   return { parties: parties ?? [], summary };
@@ -79,7 +75,7 @@ export const actions: Actions = {
       if (error.code === "23505") {
         return fail(400, {
           error:
-            "A party with that name already exists. Add a last initial or similar to tell them apart (e.g. \"The Smiths - J\").",
+            'A party with that name already exists. Add a last initial or similar to tell them apart (e.g. "The Smiths - J").',
         });
       }
       return fail(500, { error: "Could not create party." });
