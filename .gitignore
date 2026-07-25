@@ -27,3 +27,6 @@ vite.config.ts.timestamp-*
 
 # Ignore Wrangler-generated workspace files
 pnpm-workspace.yaml
+
+# Local
+data/
