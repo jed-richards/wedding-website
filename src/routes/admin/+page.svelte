@@ -55,14 +55,6 @@
         <li>Not attending: {data.summary.notAttending}</li>
         <li>No response: {data.summary.noResponse}</li>
       </ul>
-      {#if Object.keys(data.summary.mealCounts).length > 0}
-        <p class="mt-2 text-sm text-gray-700">
-          Meals:
-          {#each Object.entries(data.summary.mealCounts) as [meal, count] (meal)}
-            <span class="mr-3">{meal}: {count}</span>
-          {/each}
-        </p>
-      {/if}
     </section>
 
     <section class="mb-10">
@@ -116,9 +108,6 @@
                   {guest.first_name}
                   {guest.last_name} —
                   {attendanceLabel(guest.is_attending)}
-                  {#if guest.meal_choice}
-                    ({guest.meal_choice})
-                  {/if}
                   {#if guest.dietary_notes}
                     <span class="text-gray-500">— {guest.dietary_notes}</span>
                   {/if}

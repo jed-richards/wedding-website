@@ -85,20 +85,6 @@
           </div>
 
           <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium">Meal choice</span>
-            <select name={`meal_${guest.id}`} class="rounded-md border-gray-300">
-              <option value="" disabled selected={!guest.meal_choice}
-                >Select a meal</option
-              >
-              {#each data.mealOptions as meal (meal.value)}
-                <option value={meal.value} selected={guest.meal_choice === meal.value}>
-                  {meal.label}
-                </option>
-              {/each}
-            </select>
-          </label>
-
-          <label class="flex flex-col gap-1">
             <span class="text-sm font-medium">Dietary notes (optional)</span>
             <textarea
               name={`notes_${guest.id}`}

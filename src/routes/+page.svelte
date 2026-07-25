@@ -23,10 +23,7 @@
 
   <div class="flex flex-col gap-1 font-body text-text">
     <p>{formattedDate}</p>
-    <p class="text-text-muted">
-      <!-- TODO: set real venue -->
-      Venue to be announced
-    </p>
+    <p class="text-text-muted">Mahoney State Park</p>
   </div>
 
   <Countdown />
