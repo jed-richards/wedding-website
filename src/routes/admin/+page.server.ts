@@ -8,7 +8,7 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
     .from("parties")
     .select(
-      "id, party_name, guests(id, first_name, last_name, is_attending, dietary_notes)",
+      "id, party_name, max_party_size, guests(id, first_name, last_name, is_attending, dietary_notes, is_plus_one)",
     )
     .order("party_name");
 
@@ -193,7 +193,12 @@ export const actions: Actions = {
     // insert fails we delete the just-created parties to avoid orphaned parties.
     const { data: insertedParties, error: partyError } = await supabase
       .from("parties")
-      .insert(parsed.parties.map((p) => ({ party_name: p.partyName })))
+      .insert(
+        parsed.parties.map((p) => ({
+          party_name: p.partyName,
+          max_party_size: p.maxPartySize,
+        })),
+      )
       .select("id, party_name");
     if (partyError || !insertedParties) {
       if (partyError?.code === "23505") {

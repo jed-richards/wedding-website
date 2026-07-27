@@ -92,7 +92,9 @@
         Upload a JSON file to create many parties and guests at once. It must be an
         array of parties, each with a <code>party_name</code> and a non-empty
         <code>guests</code> array of <code>first_name</code> /
-        <code>last_name</code> objects. Party names must be unique and not already in use.
+        <code>last_name</code> objects. Party names must be unique and not already in
+        use. Optionally add a <code>max_party_size</code> to give the party open plus-one
+        slots beyond its named guests (e.g. size 2 with 1 named guest = 1 open plus-one slot).
       </p>
       <form
         method="POST"
@@ -142,7 +144,13 @@
       {#each data.parties as party (party.id)}
         <div class="rounded-md border border-gray-200 p-4">
           <div class="mb-3 flex items-center justify-between">
-            <h3 class="text-lg font-medium">{party.party_name}</h3>
+            <h3 class="text-lg font-medium">
+              {party.party_name}
+              <span class="text-sm font-normal text-gray-500">
+                ({party.guests.filter((g) => !g.is_plus_one)
+                  .length}/{party.max_party_size})
+              </span>
+            </h3>
             <div class="flex items-center gap-3 text-sm text-gray-500">
               <form method="POST" action="?/deleteParty" use:enhance>
                 <input type="hidden" name="party_id" value={party.id} />
@@ -158,7 +166,13 @@
               <li class="flex items-center justify-between text-sm">
                 <span>
                   {guest.first_name}
-                  {guest.last_name} —
+                  {guest.last_name}
+                  {#if guest.is_plus_one}
+                    <span
+                      class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
+                      >+1</span
+                    >
+                  {/if} —
                   {attendanceLabel(guest.is_attending)}
                   {#if guest.dietary_notes}
                     <span class="text-gray-500">— {guest.dietary_notes}</span>
