@@ -1,8 +1,31 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { createAuthClient, createServiceClient } from "$lib/server/supabase";
 import { getAdminSession, requireAdminEmail } from "$lib/server/auth";
-import { MAX_IMPORT_BYTES, parseImport } from "$lib/server/importGuests";
+import {
+  MAX_IMPORT_BYTES,
+  MAX_PARTY_SIZE,
+  parseImport,
+} from "$lib/server/importGuests";
 import type { Actions, PageServerLoad } from "./$types";
+
+/** Parses and range-checks a `max_party_size` form field. `minSize` is the
+ * number of named guests already on the party (it can't shrink below that). */
+function parseMaxPartySize(
+  raw: FormDataEntryValue | null,
+  minSize: number,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (raw === null || String(raw).trim() === "") {
+    return { ok: true, value: Math.max(1, minSize) };
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minSize || value > MAX_PARTY_SIZE) {
+    return {
+      ok: false,
+      error: `Party size must be a whole number between ${Math.max(1, minSize)} and ${MAX_PARTY_SIZE}.`,
+    };
+  }
+  return { ok: true, value };
+}
 
 async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
@@ -70,8 +93,15 @@ export const actions: Actions = {
       return fail(400, { error: "Party name is required." });
     }
 
+    const sizeResult = parseMaxPartySize(formData.get("max_party_size"), 1);
+    if (!sizeResult.ok) {
+      return fail(400, { error: sizeResult.error });
+    }
+
     const supabase = createServiceClient(env);
-    const { error } = await supabase.from("parties").insert({ party_name: partyName });
+    const { error } = await supabase
+      .from("parties")
+      .insert({ party_name: partyName, max_party_size: sizeResult.value });
     if (error) {
       if (error.code === "23505") {
         return fail(400, {
@@ -83,6 +113,54 @@ export const actions: Actions = {
     }
 
     return { partyCreated: true };
+  },
+
+  updateParty: async ({ request, cookies, platform }) => {
+    const env = platform!.env;
+    if (!(await requireAdminEmail(cookies, env)))
+      return fail(401, { error: "Not signed in." });
+
+    const formData = await request.formData();
+    const partyId = String(formData.get("party_id") ?? "");
+    const partyName = String(formData.get("party_name") ?? "").trim();
+    if (!partyId || !partyName) {
+      return fail(400, { error: "Party name is required.", partyId });
+    }
+
+    const supabase = createServiceClient(env);
+
+    const { count: namedCount, error: countError } = await supabase
+      .from("guests")
+      .select("id", { count: "exact", head: true })
+      .eq("party_id", partyId)
+      .eq("is_plus_one", false);
+    if (countError) {
+      return fail(500, { error: "Could not update party.", partyId });
+    }
+
+    const sizeResult = parseMaxPartySize(
+      formData.get("max_party_size"),
+      namedCount ?? 1,
+    );
+    if (!sizeResult.ok) {
+      return fail(400, { error: sizeResult.error, partyId });
+    }
+
+    const { error } = await supabase
+      .from("parties")
+      .update({ party_name: partyName, max_party_size: sizeResult.value })
+      .eq("id", partyId);
+    if (error) {
+      if (error.code === "23505") {
+        return fail(400, {
+          error: "A party with that name already exists.",
+          partyId,
+        });
+      }
+      return fail(500, { error: "Could not update party.", partyId });
+    }
+
+    return { partyUpdated: true, partyId };
   },
 
   deleteParty: async ({ request, cookies, platform }) => {
