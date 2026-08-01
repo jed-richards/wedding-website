@@ -74,6 +74,16 @@
             class="rounded-md border-gray-300"
           />
         </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-sm font-medium">Max party size</span>
+          <input
+            type="number"
+            name="max_party_size"
+            min="1"
+            placeholder="1"
+            class="w-24 rounded-md border-gray-300"
+          />
+        </label>
         <button
           type="submit"
           class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
@@ -81,7 +91,11 @@
           Add party
         </button>
       </form>
-      {#if form?.error}
+      <p class="mt-2 text-sm text-gray-500">
+        Max party size beyond the named guests you add below becomes open plus-one slots
+        the party can fill in themselves when they RSVP.
+      </p>
+      {#if form?.error && !form?.partyId}
         <p class="mt-2 text-sm text-red-600">{form.error}</p>
       {/if}
     </section>
@@ -92,7 +106,9 @@
         Upload a JSON file to create many parties and guests at once. It must be an
         array of parties, each with a <code>party_name</code> and a non-empty
         <code>guests</code> array of <code>first_name</code> /
-        <code>last_name</code> objects. Party names must be unique and not already in use.
+        <code>last_name</code> objects. Party names must be unique and not already in
+        use. Optionally add a <code>max_party_size</code> to give the party open plus-one
+        slots beyond its named guests (e.g. size 2 with 1 named guest = 1 open plus-one slot).
       </p>
       <form
         method="POST"
@@ -141,16 +157,56 @@
     <section class="flex flex-col gap-8">
       {#each data.parties as party (party.id)}
         <div class="rounded-md border border-gray-200 p-4">
-          <div class="mb-3 flex items-center justify-between">
-            <h3 class="text-lg font-medium">{party.party_name}</h3>
-            <div class="flex items-center gap-3 text-sm text-gray-500">
-              <form method="POST" action="?/deleteParty" use:enhance>
-                <input type="hidden" name="party_id" value={party.id} />
-                <button type="submit" class="text-red-600 hover:underline"
-                  >Delete party</button
-                >
-              </form>
-            </div>
+          <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <form
+              method="POST"
+              action="?/updateParty"
+              use:enhance
+              class="flex flex-wrap items-end gap-3"
+            >
+              <input type="hidden" name="party_id" value={party.id} />
+              <label class="flex flex-col gap-1">
+                <span class="text-sm font-medium">Party name</span>
+                <input
+                  type="text"
+                  name="party_name"
+                  value={party.party_name}
+                  required
+                  class="rounded-md border-gray-300"
+                />
+              </label>
+              <label class="flex flex-col gap-1">
+                <span class="text-sm font-medium">
+                  Max party size
+                  <span class="font-normal text-gray-500">
+                    ({party.guests.filter((g) => !g.is_plus_one).length} named)
+                  </span>
+                </span>
+                <input
+                  type="number"
+                  name="max_party_size"
+                  value={party.max_party_size}
+                  min="1"
+                  required
+                  class="w-24 rounded-md border-gray-300"
+                />
+              </label>
+              <button
+                type="submit"
+                class="rounded-md bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700"
+              >
+                Save
+              </button>
+              {#if form?.error && form?.partyId === party.id}
+                <p class="text-sm text-red-600">{form.error}</p>
+              {/if}
+            </form>
+            <form method="POST" action="?/deleteParty" use:enhance>
+              <input type="hidden" name="party_id" value={party.id} />
+              <button type="submit" class="text-sm text-red-600 hover:underline">
+                Delete party
+              </button>
+            </form>
           </div>
 
           <ul class="mb-4 flex flex-col gap-2">
@@ -158,7 +214,13 @@
               <li class="flex items-center justify-between text-sm">
                 <span>
                   {guest.first_name}
-                  {guest.last_name} —
+                  {guest.last_name}
+                  {#if guest.is_plus_one}
+                    <span
+                      class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
+                      >+1</span
+                    >
+                  {/if} —
                   {attendanceLabel(guest.is_attending)}
                   {#if guest.dietary_notes}
                     <span class="text-gray-500">— {guest.dietary_notes}</span>

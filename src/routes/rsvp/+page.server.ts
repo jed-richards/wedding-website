@@ -10,18 +10,22 @@ async function loadParty(
 ) {
   const { data: party } = await supabase
     .from("parties")
-    .select("id, party_name")
+    .select("id, party_name, max_party_size")
     .eq("id", partyId)
     .maybeSingle();
   if (!party) return null;
 
   const { data: guests } = await supabase
     .from("guests")
-    .select("id, first_name, last_name, is_attending, dietary_notes")
+    .select("id, first_name, last_name, is_attending, dietary_notes, is_plus_one")
     .eq("party_id", partyId)
     .order("first_name");
 
-  return { party, guests: guests ?? [] };
+  const named = (guests ?? []).filter((g) => !g.is_plus_one);
+  const plusOnes = (guests ?? []).filter((g) => g.is_plus_one);
+  const openSlots = Math.max(0, party.max_party_size - named.length);
+
+  return { party, named, plusOnes, openSlots };
 }
 
 export const load: PageServerLoad = async ({ cookies, platform }) => {
@@ -80,20 +84,33 @@ export const actions: Actions = {
 
     const supabase = createServiceClient(platform!.env);
 
+    const { data: party } = await supabase
+      .from("parties")
+      .select("max_party_size")
+      .eq("id", partyId)
+      .maybeSingle();
+    if (!party) {
+      return fail(401, {
+        error: "Your session expired. Please enter your party name again.",
+      });
+    }
+
     // Only ever touch guests that actually belong to this party.
     const { data: partyGuests } = await supabase
       .from("guests")
-      .select("id")
+      .select("id, is_plus_one")
       .eq("party_id", partyId);
-    const validGuestIds = new Set((partyGuests ?? []).map((g) => g.id));
-    if (validGuestIds.size === 0) {
+    const namedGuestIds = (partyGuests ?? [])
+      .filter((g) => !g.is_plus_one)
+      .map((g) => g.id);
+    if (namedGuestIds.length === 0) {
       return fail(401, {
         error: "Your session expired. Please enter your party name again.",
       });
     }
 
     const formData = await request.formData();
-    const updates = [...validGuestIds].map((guestId) => {
+    const updates = namedGuestIds.map((guestId) => {
       const attending = formData.get(`attending_${guestId}`);
       const notes = formData.get(`notes_${guestId}`);
       return {
@@ -111,6 +128,47 @@ export const actions: Actions = {
         return fail(500, {
           error: "Something went wrong saving your RSVP. Please try again.",
         });
+      }
+    }
+
+    // Never trust a client-supplied slot count: recompute from the named
+    // guests we just confirmed belong to this party.
+    const openSlots = Math.max(0, party.max_party_size - namedGuestIds.length);
+    if (openSlots > 0) {
+      const plusOnes = Array.from({ length: openSlots }, (_, i) => {
+        const firstName = String(formData.get(`plus_first_${i}`) ?? "").trim();
+        const lastName = String(formData.get(`plus_last_${i}`) ?? "").trim();
+        const notes = String(formData.get(`plus_notes_${i}`) ?? "").trim();
+        return { firstName, lastName, notes };
+      }).filter((g) => g.firstName.length > 0);
+
+      const { error: deleteError } = await supabase
+        .from("guests")
+        .delete()
+        .eq("party_id", partyId)
+        .eq("is_plus_one", true);
+      if (deleteError) {
+        return fail(500, {
+          error: "Something went wrong saving your RSVP. Please try again.",
+        });
+      }
+
+      if (plusOnes.length > 0) {
+        const { error: insertError } = await supabase.from("guests").insert(
+          plusOnes.map((g) => ({
+            party_id: partyId,
+            first_name: g.firstName,
+            last_name: g.lastName || null,
+            is_plus_one: true,
+            is_attending: true,
+            dietary_notes: g.notes || null,
+          })),
+        );
+        if (insertError) {
+          return fail(500, {
+            error: "Something went wrong saving your RSVP. Please try again.",
+          });
+        }
       }
     }
 

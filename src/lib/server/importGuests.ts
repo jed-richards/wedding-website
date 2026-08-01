@@ -10,9 +10,13 @@ export interface ImportGuest {
   lastName: string;
 }
 
-/** One party plus its guests, validated and normalised from an import file. */
+/** One party plus its guests, validated and normalised from an import file.
+ * `maxPartySize` is the total number of seats the party has, including any
+ * unnamed plus-ones a guest can fill in later at RSVP time; it defaults to
+ * the named guest count (no plus-ones) when omitted from the file. */
 export interface ImportParty {
   partyName: string;
+  maxPartySize: number;
   guests: ImportGuest[];
 }
 
@@ -22,6 +26,8 @@ export type ParseResult =
 /** Guards against oversized uploads given Cloudflare Workers' request limits. */
 export const MAX_IMPORT_BYTES = 1_000_000;
 export const MAX_PARTIES = 500;
+/** Sane upper bound on seats for a single party; catches obvious typos. */
+export const MAX_PARTY_SIZE = 20;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -107,8 +113,27 @@ export function parseImport(raw: string): ParseResult {
       }
     }
 
+    // max_party_size is optional; when omitted every guest is named and there
+    // are no open plus-one slots.
+    let maxPartySize = guests.length;
+    if (entry.max_party_size !== undefined) {
+      const raw = entry.max_party_size;
+      if (
+        typeof raw !== "number" ||
+        !Number.isInteger(raw) ||
+        raw < guests.length ||
+        raw > MAX_PARTY_SIZE
+      ) {
+        errors.push(
+          `${label}: "max_party_size" must be a whole number between ${guests.length} (the number of named guests) and ${MAX_PARTY_SIZE}.`,
+        );
+      } else {
+        maxPartySize = raw;
+      }
+    }
+
     if (partyName && guests.length > 0) {
-      parties.push({ partyName, guests });
+      parties.push({ partyName, maxPartySize, guests });
     }
   });
 
