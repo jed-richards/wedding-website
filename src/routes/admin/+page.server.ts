@@ -5,23 +5,40 @@ import {
   MAX_IMPORT_BYTES,
   MAX_PARTY_SIZE,
   parseImport,
-} from "$lib/server/importGuests";
+} from "$lib/server/importParties";
 import type { Actions, PageServerLoad } from "./$types";
 
-/** Parses and range-checks a `max_party_size` form field. `minSize` is the
- * number of named guests already on the party (it can't shrink below that). */
+/** Parses and range-checks a `max_party_size` form field. */
 function parseMaxPartySize(
   raw: FormDataEntryValue | null,
-  minSize: number,
 ): { ok: true; value: number } | { ok: false; error: string } {
   if (raw === null || String(raw).trim() === "") {
-    return { ok: true, value: Math.max(1, minSize) };
+    return { ok: true, value: 1 };
   }
   const value = Number(raw);
-  if (!Number.isInteger(value) || value < minSize || value > MAX_PARTY_SIZE) {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_PARTY_SIZE) {
     return {
       ok: false,
-      error: `Party size must be a whole number between ${Math.max(1, minSize)} and ${MAX_PARTY_SIZE}.`,
+      error: `Party size must be a whole number between 1 and ${MAX_PARTY_SIZE}.`,
+    };
+  }
+  return { ok: true, value };
+}
+
+/** Parses and range-checks a `plus_ones` form field against the party's
+ * (already-validated) `maxPartySize`. */
+function parsePlusOnes(
+  raw: FormDataEntryValue | null,
+  maxPartySize: number,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (raw === null || String(raw).trim() === "") {
+    return { ok: true, value: 0 };
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0 || value > maxPartySize) {
+    return {
+      ok: false,
+      error: `Plus-ones must be a whole number between 0 and ${maxPartySize} (max party size).`,
     };
   }
   return { ok: true, value };
@@ -31,19 +48,19 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
     .from("parties")
     .select(
-      "id, party_name, max_party_size, guests(id, first_name, last_name, is_attending, dietary_notes, is_plus_one)",
+      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes",
     )
     .order("party_name");
 
-  const allGuests = (parties ?? []).flatMap((p) => p.guests ?? []);
+  const rows = parties ?? [];
   const summary = {
-    totalGuests: allGuests.length,
-    attending: allGuests.filter((g) => g.is_attending === true).length,
-    notAttending: allGuests.filter((g) => g.is_attending === false).length,
-    noResponse: allGuests.filter((g) => g.is_attending === null).length,
+    totalSeats: rows.reduce((sum, p) => sum + p.max_party_size, 0),
+    attending: rows.reduce((sum, p) => sum + (p.attending_count ?? 0), 0),
+    responded: rows.filter((p) => p.attending_count !== null).length,
+    noResponse: rows.filter((p) => p.attending_count === null).length,
   };
 
-  return { parties: parties ?? [], summary };
+  return { parties: rows, summary };
 }
 
 export const load: PageServerLoad = async ({ cookies, platform }) => {
@@ -89,19 +106,27 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const partyName = String(formData.get("party_name") ?? "").trim();
+    const displayName = String(formData.get("display_name") ?? "").trim() || partyName;
     if (!partyName) {
       return fail(400, { error: "Party name is required." });
     }
 
-    const sizeResult = parseMaxPartySize(formData.get("max_party_size"), 1);
+    const sizeResult = parseMaxPartySize(formData.get("max_party_size"));
     if (!sizeResult.ok) {
       return fail(400, { error: sizeResult.error });
     }
+    const plusOnesResult = parsePlusOnes(formData.get("plus_ones"), sizeResult.value);
+    if (!plusOnesResult.ok) {
+      return fail(400, { error: plusOnesResult.error });
+    }
 
     const supabase = createServiceClient(env);
-    const { error } = await supabase
-      .from("parties")
-      .insert({ party_name: partyName, max_party_size: sizeResult.value });
+    const { error } = await supabase.from("parties").insert({
+      party_name: partyName,
+      display_name: displayName,
+      max_party_size: sizeResult.value,
+      plus_ones: plusOnesResult.value,
+    });
     if (error) {
       if (error.code === "23505") {
         return fail(400, {
@@ -123,32 +148,29 @@ export const actions: Actions = {
     const formData = await request.formData();
     const partyId = String(formData.get("party_id") ?? "");
     const partyName = String(formData.get("party_name") ?? "").trim();
+    const displayName = String(formData.get("display_name") ?? "").trim() || partyName;
     if (!partyId || !partyName) {
       return fail(400, { error: "Party name is required.", partyId });
     }
 
-    const supabase = createServiceClient(env);
-
-    const { count: namedCount, error: countError } = await supabase
-      .from("guests")
-      .select("id", { count: "exact", head: true })
-      .eq("party_id", partyId)
-      .eq("is_plus_one", false);
-    if (countError) {
-      return fail(500, { error: "Could not update party.", partyId });
-    }
-
-    const sizeResult = parseMaxPartySize(
-      formData.get("max_party_size"),
-      namedCount ?? 1,
-    );
+    const sizeResult = parseMaxPartySize(formData.get("max_party_size"));
     if (!sizeResult.ok) {
       return fail(400, { error: sizeResult.error, partyId });
     }
+    const plusOnesResult = parsePlusOnes(formData.get("plus_ones"), sizeResult.value);
+    if (!plusOnesResult.ok) {
+      return fail(400, { error: plusOnesResult.error, partyId });
+    }
 
+    const supabase = createServiceClient(env);
     const { error } = await supabase
       .from("parties")
-      .update({ party_name: partyName, max_party_size: sizeResult.value })
+      .update({
+        party_name: partyName,
+        display_name: displayName,
+        max_party_size: sizeResult.value,
+        plus_ones: plusOnesResult.value,
+      })
       .eq("id", partyId);
     if (error) {
       if (error.code === "23505") {
@@ -177,44 +199,6 @@ export const actions: Actions = {
     if (error) return fail(500, { error: "Could not delete party." });
 
     return { partyDeleted: true };
-  },
-
-  createGuest: async ({ request, cookies, platform }) => {
-    const env = platform!.env;
-    if (!(await requireAdminEmail(cookies, env)))
-      return fail(401, { error: "Not signed in." });
-
-    const formData = await request.formData();
-    const partyId = String(formData.get("party_id") ?? "");
-    const firstName = String(formData.get("first_name") ?? "").trim();
-    const lastName = String(formData.get("last_name") ?? "").trim();
-    if (!partyId || !firstName || !lastName) {
-      return fail(400, { error: "First name and last name are required." });
-    }
-
-    const supabase = createServiceClient(env);
-    const { error } = await supabase
-      .from("guests")
-      .insert({ party_id: partyId, first_name: firstName, last_name: lastName });
-    if (error) return fail(500, { error: "Could not add guest." });
-
-    return { guestCreated: true };
-  },
-
-  deleteGuest: async ({ request, cookies, platform }) => {
-    const env = platform!.env;
-    if (!(await requireAdminEmail(cookies, env)))
-      return fail(401, { error: "Not signed in." });
-
-    const formData = await request.formData();
-    const guestId = String(formData.get("guest_id") ?? "");
-    if (!guestId) return fail(400, { error: "Missing guest." });
-
-    const supabase = createServiceClient(env);
-    const { error } = await supabase.from("guests").delete().eq("id", guestId);
-    if (error) return fail(500, { error: "Could not delete guest." });
-
-    return { guestDeleted: true };
   },
 
   importJson: async ({ request, cookies, platform }) => {
@@ -266,18 +250,17 @@ export const actions: Actions = {
       });
     }
 
-    // Two batched inserts (parties, then their guests) instead of a round trip
-    // per row. Postgres has no cross-statement transaction here, so if the guest
-    // insert fails we delete the just-created parties to avoid orphaned parties.
     const { data: insertedParties, error: partyError } = await supabase
       .from("parties")
       .insert(
         parsed.parties.map((p) => ({
           party_name: p.partyName,
+          display_name: p.displayName,
           max_party_size: p.maxPartySize,
+          plus_ones: p.plusOnes,
         })),
       )
-      .select("id, party_name");
+      .select("id");
     if (partyError || !insertedParties) {
       if (partyError?.code === "23505") {
         return fail(400, {
@@ -289,35 +272,9 @@ export const actions: Actions = {
       return fail(500, { importErrors: ["Could not import parties."] });
     }
 
-    const idByName = new Map(
-      insertedParties.map((p) => [p.party_name.toLowerCase(), p.id]),
-    );
-    const guestRows = parsed.parties.flatMap((party) =>
-      party.guests.map((guest) => ({
-        party_id: idByName.get(party.partyName.toLowerCase())!,
-        first_name: guest.firstName,
-        last_name: guest.lastName,
-      })),
-    );
-
-    const { error: guestError } = await supabase.from("guests").insert(guestRows);
-    if (guestError) {
-      await supabase
-        .from("parties")
-        .delete()
-        .in(
-          "id",
-          insertedParties.map((p) => p.id),
-        );
-      return fail(500, {
-        importErrors: ["Could not import guests; the import was rolled back."],
-      });
-    }
-
     return {
       imported: {
         parties: insertedParties.length,
-        guests: guestRows.length,
       },
     };
   },

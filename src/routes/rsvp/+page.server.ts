@@ -10,22 +10,12 @@ async function loadParty(
 ) {
   const { data: party } = await supabase
     .from("parties")
-    .select("id, party_name, max_party_size")
+    .select(
+      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes",
+    )
     .eq("id", partyId)
     .maybeSingle();
-  if (!party) return null;
-
-  const { data: guests } = await supabase
-    .from("guests")
-    .select("id, first_name, last_name, is_attending, dietary_notes, is_plus_one")
-    .eq("party_id", partyId)
-    .order("first_name");
-
-  const named = (guests ?? []).filter((g) => !g.is_plus_one);
-  const plusOnes = (guests ?? []).filter((g) => g.is_plus_one);
-  const openSlots = Math.max(0, party.max_party_size - named.length);
-
-  return { party, named, plusOnes, openSlots };
+  return party;
 }
 
 export const load: PageServerLoad = async ({ cookies, platform }) => {
@@ -33,14 +23,14 @@ export const load: PageServerLoad = async ({ cookies, platform }) => {
   if (!partyId) return { session: null };
 
   const supabase = createServiceClient(platform!.env);
-  const session = await loadParty(supabase, partyId);
-  if (!session) {
+  const party = await loadParty(supabase, partyId);
+  if (!party) {
     // Stale/invalid cookie (party deleted, etc) — fall back to the name gate.
     cookies.delete(PARTY_COOKIE, { path: "/rsvp" });
     return { session: null };
   }
 
-  return { session };
+  return { session: { party } };
 };
 
 export const actions: Actions = {
@@ -95,81 +85,37 @@ export const actions: Actions = {
       });
     }
 
-    // Only ever touch guests that actually belong to this party.
-    const { data: partyGuests } = await supabase
-      .from("guests")
-      .select("id, is_plus_one")
-      .eq("party_id", partyId);
-    const namedGuestIds = (partyGuests ?? [])
-      .filter((g) => !g.is_plus_one)
-      .map((g) => g.id);
-    if (namedGuestIds.length === 0) {
-      return fail(401, {
-        error: "Your session expired. Please enter your party name again.",
+    const formData = await request.formData();
+    const rawCount = formData.get("attending_count");
+    const attendingCount = Number(rawCount);
+    if (
+      rawCount === null ||
+      !Number.isInteger(attendingCount) ||
+      attendingCount < 0 ||
+      attendingCount > party.max_party_size
+    ) {
+      return fail(400, {
+        error: "Please choose a valid number of attendees.",
       });
     }
 
-    const formData = await request.formData();
-    const updates = namedGuestIds.map((guestId) => {
-      const attending = formData.get(`attending_${guestId}`);
-      const notes = formData.get(`notes_${guestId}`);
-      return {
-        id: guestId,
-        is_attending: attending === "yes" ? true : attending === "no" ? false : null,
-        dietary_notes: attending === "yes" ? String(notes ?? "").trim() || null : null,
+    const dietaryNotes =
+      attendingCount > 0
+        ? String(formData.get("dietary_notes") ?? "").trim() || null
+        : null;
+
+    const { error } = await supabase
+      .from("parties")
+      .update({
+        attending_count: attendingCount,
+        dietary_notes: dietaryNotes,
         updated_at: new Date().toISOString(),
-      };
-    });
-
-    for (const update of updates) {
-      const { id, ...fields } = update;
-      const { error } = await supabase.from("guests").update(fields).eq("id", id);
-      if (error) {
-        return fail(500, {
-          error: "Something went wrong saving your RSVP. Please try again.",
-        });
-      }
-    }
-
-    // Never trust a client-supplied slot count: recompute from the named
-    // guests we just confirmed belong to this party.
-    const openSlots = Math.max(0, party.max_party_size - namedGuestIds.length);
-    if (openSlots > 0) {
-      const plusOnes = Array.from({ length: openSlots }, (_, i) => {
-        const firstName = String(formData.get(`plus_first_${i}`) ?? "").trim();
-        const lastName = String(formData.get(`plus_last_${i}`) ?? "").trim();
-        const notes = String(formData.get(`plus_notes_${i}`) ?? "").trim();
-        return { firstName, lastName, notes };
-      }).filter((g) => g.firstName.length > 0);
-
-      const { error: deleteError } = await supabase
-        .from("guests")
-        .delete()
-        .eq("party_id", partyId)
-        .eq("is_plus_one", true);
-      if (deleteError) {
-        return fail(500, {
-          error: "Something went wrong saving your RSVP. Please try again.",
-        });
-      }
-
-      if (plusOnes.length > 0) {
-        const { error: insertError } = await supabase.from("guests").insert(
-          plusOnes.map((g) => ({
-            party_id: partyId,
-            first_name: g.firstName,
-            last_name: g.lastName || null,
-            is_plus_one: true,
-            is_attending: true,
-            dietary_notes: g.notes || null,
-          })),
-        );
-        if (insertError) {
-          return fail(500, {
-            error: "Something went wrong saving your RSVP. Please try again.",
-          });
-        }
-      }
+      })
+      .eq("id", partyId);
+    if (error) {
+      return fail(500, {
+        error: "Something went wrong saving your RSVP. Please try again.",
+      });
     }
 
     return { saved: true };

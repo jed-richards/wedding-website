@@ -2,22 +2,16 @@
  * any Supabase or request dependencies so the shape/validation rules are easy to
  * reason about (and test) in isolation from the form action that persists them. */
 
-/** A single validated, trimmed guest. The uploaded file uses snake_case keys
- * (`first_name`/`last_name`); those are read at parse time and normalised into
- * this camelCase domain shape. */
-export interface ImportGuest {
-  firstName: string;
-  lastName: string;
-}
-
-/** One party plus its guests, validated and normalised from an import file.
- * `maxPartySize` is the total number of seats the party has, including any
- * unnamed plus-ones a guest can fill in later at RSVP time; it defaults to
- * the named guest count (no plus-ones) when omitted from the file. */
+/** One validated, trimmed party from an import file. The uploaded file uses
+ * snake_case keys (`party_name`/`display_name`/`max_party_size`/`plus_ones`);
+ * those are read at parse time and normalised into this camelCase domain
+ * shape. `plusOnes` is how many of `maxPartySize`'s seats are unnamed
+ * plus-ones; the rest are the named invitees implied by `displayName`. */
 export interface ImportParty {
   partyName: string;
+  displayName: string;
   maxPartySize: number;
-  guests: ImportGuest[];
+  plusOnes: number;
 }
 
 export type ParseResult =
@@ -82,28 +76,6 @@ export function parseImport(raw: string): ParseResult {
     }
     const label = partyName ? `"${partyName}"` : positional;
 
-    const guests: ImportGuest[] = [];
-    const guestsRaw = entry.guests;
-    if (!Array.isArray(guestsRaw) || guestsRaw.length === 0) {
-      errors.push(`${label}: "guests" must be a non-empty array.`);
-    } else {
-      guestsRaw.forEach((guest, j) => {
-        if (!isRecord(guest)) {
-          errors.push(`${label}, guest ${j + 1}: must be an object.`);
-          return;
-        }
-        const firstName = trimmedString(guest.first_name);
-        const lastName = trimmedString(guest.last_name);
-        if (!firstName || !lastName) {
-          errors.push(
-            `${label}, guest ${j + 1}: "first_name" and "last_name" are required.`,
-          );
-          return;
-        }
-        guests.push({ firstName, lastName });
-      });
-    }
-
     if (partyName) {
       const key = partyName.toLowerCase();
       if (seenNames.has(key)) {
@@ -113,27 +85,49 @@ export function parseImport(raw: string): ParseResult {
       }
     }
 
-    // max_party_size is optional; when omitted every guest is named and there
-    // are no open plus-one slots.
-    let maxPartySize = guests.length;
+    // display_name is optional; when omitted it falls back to party_name.
+    const displayName = trimmedString(entry.display_name) || partyName;
+
+    // max_party_size is optional and defaults to 1 (just the named party,
+    // no plus-ones).
+    let maxPartySize = 1;
     if (entry.max_party_size !== undefined) {
-      const raw = entry.max_party_size;
+      const rawSize = entry.max_party_size;
       if (
-        typeof raw !== "number" ||
-        !Number.isInteger(raw) ||
-        raw < guests.length ||
-        raw > MAX_PARTY_SIZE
+        typeof rawSize !== "number" ||
+        !Number.isInteger(rawSize) ||
+        rawSize < 1 ||
+        rawSize > MAX_PARTY_SIZE
       ) {
         errors.push(
-          `${label}: "max_party_size" must be a whole number between ${guests.length} (the number of named guests) and ${MAX_PARTY_SIZE}.`,
+          `${label}: "max_party_size" must be a whole number between 1 and ${MAX_PARTY_SIZE}.`,
         );
       } else {
-        maxPartySize = raw;
+        maxPartySize = rawSize;
       }
     }
 
-    if (partyName && guests.length > 0) {
-      parties.push({ partyName, maxPartySize, guests });
+    // plus_ones is optional and defaults to 0 (every seat is named); it can't
+    // exceed max_party_size.
+    let plusOnes = 0;
+    if (entry.plus_ones !== undefined) {
+      const rawPlusOnes = entry.plus_ones;
+      if (
+        typeof rawPlusOnes !== "number" ||
+        !Number.isInteger(rawPlusOnes) ||
+        rawPlusOnes < 0 ||
+        rawPlusOnes > maxPartySize
+      ) {
+        errors.push(
+          `${label}: "plus_ones" must be a whole number between 0 and ${maxPartySize} (max_party_size).`,
+        );
+      } else {
+        plusOnes = rawPlusOnes;
+      }
+    }
+
+    if (partyName) {
+      parties.push({ partyName, displayName, maxPartySize, plusOnes });
     }
   });
 
