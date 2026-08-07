@@ -5,6 +5,23 @@
   let { data, form }: PageProps = $props();
 
   let saved = $derived(form?.saved === true);
+
+  function attendingCountOptions(maxPartySize: number) {
+    return Array.from({ length: maxPartySize + 1 }, (_, count) => count);
+  }
+
+  function seatWording(party: {
+    display_name: string;
+    max_party_size: number;
+    plus_ones: number;
+  }) {
+    const seatWord = party.max_party_size === 1 ? "seat" : "seats";
+    const plusOneClause =
+      party.plus_ones > 0
+        ? `, plus ${party.plus_ones} guest${party.plus_ones === 1 ? "" : "s"}`
+        : "";
+    return `${party.display_name}${plusOneClause} — ${party.max_party_size} ${seatWord} reserved`;
+  }
 </script>
 
 <svelte:head>
@@ -44,7 +61,7 @@
     </form>
   {:else}
     <p class="mb-6 text-gray-600">
-      RSVPing for the <strong>{data.session.party.party_name}</strong> party.
+      {seatWording(data.session.party)}
     </p>
 
     {#if saved}
@@ -54,93 +71,39 @@
       </p>
     {/if}
 
-    <form method="POST" action="?/submit" use:enhance class="flex flex-col gap-8">
-      {#each data.session.named as guest (guest.id)}
-        <fieldset class="flex flex-col gap-3 border-t border-gray-200 pt-6">
-          <legend class="text-lg font-medium"
-            >{guest.first_name} {guest.last_name}</legend
+    <form method="POST" action="?/submit" use:enhance class="flex flex-col gap-6">
+      <label class="flex flex-col gap-1">
+        <span class="text-sm font-medium">How many will attend?</span>
+        <select name="attending_count" required class="rounded-md border-gray-300">
+          <option
+            value=""
+            disabled
+            selected={data.session.party.attending_count === null}
+            >Select an option</option
           >
-
-          <div class="flex gap-6">
-            <label class="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name={`attending_${guest.id}`}
-                value="yes"
-                checked={guest.is_attending === true}
-                required
-              />
-              Attending
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name={`attending_${guest.id}`}
-                value="no"
-                checked={guest.is_attending === false}
-                required
-              />
-              Can't make it
-            </label>
-          </div>
-
-          <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium">Dietary notes (optional)</span>
-            <textarea
-              name={`notes_${guest.id}`}
-              rows="2"
-              class="rounded-md border-gray-300"
-              value={guest.dietary_notes ?? ""}></textarea>
-          </label>
-        </fieldset>
-      {/each}
-
-      {#if data.session.openSlots > 0}
-        <div class="flex flex-col gap-6 border-t border-gray-200 pt-6">
-          <p class="text-sm text-gray-600">
-            You may bring
-            {data.session.openSlots}
-            additional {data.session.openSlots === 1 ? "guest" : "guests"}.
-          </p>
-
-          {#each Array(data.session.openSlots) as _, i (i)}
-            {@const plusOne = data.session.plusOnes[i]}
-            <fieldset class="flex flex-col gap-3">
-              <legend class="text-sm font-medium">Additional guest {i + 1}</legend>
-
-              <div class="flex flex-wrap gap-3">
-                <label class="flex flex-col gap-1">
-                  <span class="text-sm font-medium">First name</span>
-                  <input
-                    type="text"
-                    name={`plus_first_${i}`}
-                    value={plusOne?.first_name ?? ""}
-                    class="rounded-md border-gray-300"
-                  />
-                </label>
-                <label class="flex flex-col gap-1">
-                  <span class="text-sm font-medium">Last name (optional)</span>
-                  <input
-                    type="text"
-                    name={`plus_last_${i}`}
-                    value={plusOne?.last_name ?? ""}
-                    class="rounded-md border-gray-300"
-                  />
-                </label>
-              </div>
-
-              <label class="flex flex-col gap-1">
-                <span class="text-sm font-medium">Dietary notes (optional)</span>
-                <textarea
-                  name={`plus_notes_${i}`}
-                  rows="2"
-                  class="rounded-md border-gray-300"
-                  value={plusOne?.dietary_notes ?? ""}></textarea>
-              </label>
-            </fieldset>
+          {#each attendingCountOptions(data.session.party.max_party_size) as count (count)}
+            <option
+              value={count}
+              selected={data.session.party.attending_count === count}
+            >
+              {count}
+            </option>
           {/each}
-        </div>
+        </select>
+      </label>
+
+      {#if form?.error}
+        <p class="text-sm text-red-600">{form.error}</p>
       {/if}
+
+      <label class="flex flex-col gap-1">
+        <span class="text-sm font-medium">Dietary notes (optional)</span>
+        <textarea
+          name="dietary_notes"
+          rows="2"
+          class="rounded-md border-gray-300"
+          value={data.session.party.dietary_notes ?? ""}></textarea>
+      </label>
 
       <button
         type="submit"

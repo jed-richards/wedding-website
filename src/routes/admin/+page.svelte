@@ -4,10 +4,10 @@
 
   let { data, form }: PageProps = $props();
 
-  function attendanceLabel(isAttending: boolean | null) {
-    if (isAttending === true) return "Attending";
-    if (isAttending === false) return "Not attending";
-    return "No response";
+  function rsvpLabel(attendingCount: number | null) {
+    if (attendingCount === null) return "No response";
+    if (attendingCount === 0) return "Not attending";
+    return `${attendingCount} attending`;
   }
 </script>
 
@@ -50,10 +50,10 @@
     <section class="mb-10 rounded-md border border-gray-200 p-4">
       <h2 class="mb-3 text-lg font-medium">Summary</h2>
       <ul class="flex flex-wrap gap-x-8 gap-y-1 text-sm text-gray-700">
-        <li>Total guests: {data.summary.totalGuests}</li>
+        <li>Total seats: {data.summary.totalSeats}</li>
         <li>Attending: {data.summary.attending}</li>
-        <li>Not attending: {data.summary.notAttending}</li>
-        <li>No response: {data.summary.noResponse}</li>
+        <li>Parties responded: {data.summary.responded}</li>
+        <li>Parties awaiting response: {data.summary.noResponse}</li>
       </ul>
     </section>
 
@@ -75,12 +75,26 @@
           />
         </label>
         <label class="flex flex-col gap-1">
+          <span class="text-sm font-medium">Display name (optional)</span>
+          <input type="text" name="display_name" class="rounded-md border-gray-300" />
+        </label>
+        <label class="flex flex-col gap-1">
           <span class="text-sm font-medium">Max party size</span>
           <input
             type="number"
             name="max_party_size"
             min="1"
             placeholder="1"
+            class="w-24 rounded-md border-gray-300"
+          />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-sm font-medium">Plus-ones</span>
+          <input
+            type="number"
+            name="plus_ones"
+            min="0"
+            placeholder="0"
             class="w-24 rounded-md border-gray-300"
           />
         </label>
@@ -92,8 +106,8 @@
         </button>
       </form>
       <p class="mt-2 text-sm text-gray-500">
-        Max party size beyond the named guests you add below becomes open plus-one slots
-        the party can fill in themselves when they RSVP.
+        Display name is the wording shown on the invite and RSVP page (defaults to the
+        party name). Plus-ones are unnamed seats within max party size.
       </p>
       {#if form?.error && !form?.partyId}
         <p class="mt-2 text-sm text-red-600">{form.error}</p>
@@ -103,12 +117,13 @@
     <section class="mb-10">
       <h2 class="mb-3 text-lg font-medium">Bulk import from JSON</h2>
       <p class="mb-3 max-w-2xl text-sm text-gray-600">
-        Upload a JSON file to create many parties and guests at once. It must be an
-        array of parties, each with a <code>party_name</code> and a non-empty
-        <code>guests</code> array of <code>first_name</code> /
-        <code>last_name</code> objects. Party names must be unique and not already in
-        use. Optionally add a <code>max_party_size</code> to give the party open plus-one
-        slots beyond its named guests (e.g. size 2 with 1 named guest = 1 open plus-one slot).
+        Upload a JSON file to create many parties at once. It must be an array of
+        objects, each with a <code>party_name</code>. Party names must be unique and not
+        already in use. Optionally add <code>display_name</code>
+        (the wording shown on the invite/RSVP page, defaults to
+        <code>party_name</code>), <code>max_party_size</code>
+        (total seats, defaults to 1), and <code>plus_ones</code>
+        (unnamed seats within max party size, defaults to 0).
       </p>
       <form
         method="POST"
@@ -137,9 +152,7 @@
       {#if form?.imported}
         <p class="mt-2 text-sm text-green-700">
           Imported {form.imported.parties}
-          {form.imported.parties === 1 ? "party" : "parties"} and
-          {form.imported.guests}
-          {form.imported.guests === 1 ? "guest" : "guests"}.
+          {form.imported.parties === 1 ? "party" : "parties"}.
         </p>
       {/if}
       {#if form?.importErrors}
@@ -154,122 +167,81 @@
       {/if}
     </section>
 
-    <section class="flex flex-col gap-8">
+    <section class="flex flex-col gap-6">
       {#each data.parties as party (party.id)}
         <div class="rounded-md border border-gray-200 p-4">
-          <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <form
-              method="POST"
-              action="?/updateParty"
-              use:enhance
-              class="flex flex-wrap items-end gap-3"
-            >
-              <input type="hidden" name="party_id" value={party.id} />
-              <label class="flex flex-col gap-1">
-                <span class="text-sm font-medium">Party name</span>
-                <input
-                  type="text"
-                  name="party_name"
-                  value={party.party_name}
-                  required
-                  class="rounded-md border-gray-300"
-                />
-              </label>
-              <label class="flex flex-col gap-1">
-                <span class="text-sm font-medium">
-                  Max party size
-                  <span class="font-normal text-gray-500">
-                    ({party.guests.filter((g) => !g.is_plus_one).length} named)
-                  </span>
-                </span>
-                <input
-                  type="number"
-                  name="max_party_size"
-                  value={party.max_party_size}
-                  min="1"
-                  required
-                  class="w-24 rounded-md border-gray-300"
-                />
-              </label>
-              <button
-                type="submit"
-                class="rounded-md bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700"
-              >
-                Save
-              </button>
-              {#if form?.error && form?.partyId === party.id}
-                <p class="text-sm text-red-600">{form.error}</p>
-              {/if}
-            </form>
-            <form method="POST" action="?/deleteParty" use:enhance>
-              <input type="hidden" name="party_id" value={party.id} />
-              <button type="submit" class="text-sm text-red-600 hover:underline">
-                Delete party
-              </button>
-            </form>
-          </div>
-
-          <ul class="mb-4 flex flex-col gap-2">
-            {#each party.guests as guest (guest.id)}
-              <li class="flex items-center justify-between text-sm">
-                <span>
-                  {guest.first_name}
-                  {guest.last_name}
-                  {#if guest.is_plus_one}
-                    <span
-                      class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
-                      >+1</span
-                    >
-                  {/if} —
-                  {attendanceLabel(guest.is_attending)}
-                  {#if guest.dietary_notes}
-                    <span class="text-gray-500">— {guest.dietary_notes}</span>
-                  {/if}
-                </span>
-                <form method="POST" action="?/deleteGuest" use:enhance>
-                  <input type="hidden" name="guest_id" value={guest.id} />
-                  <button type="submit" class="text-red-600 hover:underline"
-                    >Remove</button
-                  >
-                </form>
-              </li>
-            {:else}
-              <li class="text-sm text-gray-500">No guests yet.</li>
-            {/each}
-          </ul>
-
           <form
             method="POST"
-            action="?/createGuest"
+            action="?/updateParty"
             use:enhance
             class="flex flex-wrap items-end gap-3"
           >
             <input type="hidden" name="party_id" value={party.id} />
             <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium">First name</span>
+              <span class="text-sm font-medium">Party name</span>
               <input
                 type="text"
-                name="first_name"
+                name="party_name"
+                value={party.party_name}
                 required
                 class="rounded-md border-gray-300"
               />
             </label>
             <label class="flex flex-col gap-1">
-              <span class="text-sm font-medium">Last name</span>
+              <span class="text-sm font-medium">Display name</span>
               <input
                 type="text"
-                name="last_name"
+                name="display_name"
+                value={party.display_name}
                 required
                 class="rounded-md border-gray-300"
               />
             </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Max party size</span>
+              <input
+                type="number"
+                name="max_party_size"
+                value={party.max_party_size}
+                min="1"
+                required
+                class="w-24 rounded-md border-gray-300"
+              />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Plus-ones</span>
+              <input
+                type="number"
+                name="plus_ones"
+                value={party.plus_ones}
+                min="0"
+                required
+                class="w-24 rounded-md border-gray-300"
+              />
+            </label>
             <button
               type="submit"
-              class="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
+              class="rounded-md bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700"
             >
-              Add guest
+              Save
             </button>
+            <button
+              formaction="?/deleteParty"
+              class="text-sm text-red-600 hover:underline"
+            >
+              Delete party
+            </button>
+            {#if form?.error && form?.partyId === party.id}
+              <p class="w-full text-sm text-red-600">{form.error}</p>
+            {/if}
           </form>
+
+          <p class="mt-3 text-sm text-gray-700">
+            {rsvpLabel(party.attending_count)}
+            {#if party.dietary_notes}
+              <span class="text-gray-500">— {party.dietary_notes}</span>
+            {/if}
+          </p>
         </div>
       {:else}
         <p class="text-sm text-gray-500">No parties yet — add one above.</p>

@@ -61,7 +61,7 @@ docker compose -p supabase_wedding-website logs -f
 - `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` — public, safe to expose to the
   browser.
 - `SUPABASE_SERVICE_ROLE_KEY` — **secret**, server-only. From the Supabase dashboard:
-  Project Settings > API > service_role secret. Used to read/write `parties`/`guests`/
+  Project Settings > API > service_role secret. Used to read/write `parties`/
   `admin_users` from `/rsvp` and `/admin` server code, bypassing RLS. Never import this
   from a `.svelte` file or anywhere the browser can reach.
 
@@ -71,9 +71,9 @@ the new vars are typed on `Env`.
 For production, set the secret with `wrangler secret put SUPABASE_SERVICE_ROLE_KEY` —
 don't rely on `wrangler.jsonc` vars for it.
 
-> Note: the anon/publishable key must never be granted table access to `parties` or
-> `guests` (RLS is currently off on those tables specifically because only the
-> service-role key touches them, server-side).
+> Note: the anon/publishable key must never be granted table access to `parties`
+> (RLS is currently off on that table specifically because only the
+> service-role key touches it, server-side).
 
 ## Admin access (`/admin`)
 
