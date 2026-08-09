@@ -1,5 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import { formatPhone } from "$lib/phone";
+  import { PARK_ENTRY } from "$lib/wedding";
   import type { PageProps } from "./$types";
 
   let { data, form }: PageProps = $props();
@@ -95,6 +97,25 @@
       {#if form?.error}
         <p class="text-sm text-red-600">{form.error}</p>
       {/if}
+
+      <label class="flex flex-col gap-1">
+        <span class="text-sm font-medium">Phone number (optional)</span>
+        <input
+          type="tel"
+          name="phone"
+          inputmode="tel"
+          autocomplete="tel"
+          placeholder="(402) 555-1234"
+          class="rounded-md border-gray-300"
+          value={formatPhone(data.session.party.phone)}
+        />
+      </label>
+      <p class="-mt-4 text-sm text-gray-500">
+        We'll only use this to text you day-of details, like exactly where to enter and
+        park — no spam. The park entry fee is covered; just mention the
+        {PARK_ENTRY.weddingName} at the gate. See the
+        <a href="/travel" class="text-gray-700 underline">Travel page</a> for details.
+      </p>
 
       <label class="flex flex-col gap-1">
         <span class="text-sm font-medium">Dietary notes (optional)</span>
