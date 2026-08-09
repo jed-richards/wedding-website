@@ -105,7 +105,7 @@
           <input
             type="tel"
             name="phone"
-            placeholder="(402) 555-1234"
+            placeholder="1234567890"
             class="rounded-md border-gray-300"
           />
         </label>
@@ -237,7 +237,7 @@
                 type="tel"
                 name="phone"
                 value={formatPhone(party.phone)}
-                placeholder="(402) 555-1234"
+                placeholder="1234567890"
                 class="rounded-md border-gray-300"
               />
             </label>

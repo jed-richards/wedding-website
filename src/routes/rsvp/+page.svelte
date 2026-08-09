@@ -105,7 +105,7 @@
           name="phone"
           inputmode="tel"
           autocomplete="tel"
-          placeholder="(402) 555-1234"
+          placeholder="1234567890"
           class="rounded-md border-gray-300"
           value={formatPhone(data.session.party.phone)}
         />
