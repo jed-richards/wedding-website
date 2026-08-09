@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import { formatPhone } from "$lib/phone";
   import type { PageProps } from "./$types";
 
   let { data, form }: PageProps = $props();
@@ -54,6 +55,7 @@
         <li>Attending: {data.summary.attending}</li>
         <li>Parties responded: {data.summary.responded}</li>
         <li>Parties awaiting response: {data.summary.noResponse}</li>
+        <li>Parties with a phone number: {data.summary.withPhone}</li>
       </ul>
     </section>
 
@@ -98,6 +100,15 @@
             class="w-24 rounded-md border-gray-300"
           />
         </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-sm font-medium">Phone (optional)</span>
+          <input
+            type="tel"
+            name="phone"
+            placeholder="1234567890"
+            class="rounded-md border-gray-300"
+          />
+        </label>
         <button
           type="submit"
           class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
@@ -122,8 +133,9 @@
         already in use. Optionally add <code>display_name</code>
         (the wording shown on the invite/RSVP page, defaults to
         <code>party_name</code>), <code>max_party_size</code>
-        (total seats, defaults to 1), and <code>plus_ones</code>
-        (unnamed seats within max party size, defaults to 0).
+        (total seats, defaults to 1), <code>plus_ones</code>
+        (unnamed seats within max party size, defaults to 0), and
+        <code>phone</code> (a 10-digit US number, defaults to none).
       </p>
       <form
         method="POST"
@@ -219,6 +231,16 @@
                 class="w-24 rounded-md border-gray-300"
               />
             </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Phone (optional)</span>
+              <input
+                type="tel"
+                name="phone"
+                value={formatPhone(party.phone)}
+                placeholder="1234567890"
+                class="rounded-md border-gray-300"
+              />
+            </label>
             <button
               type="submit"
               class="rounded-md bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700"
@@ -240,6 +262,9 @@
             {rsvpLabel(party.attending_count)}
             {#if party.dietary_notes}
               <span class="text-gray-500">— {party.dietary_notes}</span>
+            {/if}
+            {#if party.phone}
+              <span class="text-gray-500">— {formatPhone(party.phone)}</span>
             {/if}
           </p>
         </div>

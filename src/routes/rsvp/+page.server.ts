@@ -1,5 +1,6 @@
 import { fail } from "@sveltejs/kit";
 import { createServiceClient } from "$lib/server/supabase";
+import { normalizePhone } from "$lib/phone";
 import type { Actions, PageServerLoad } from "./$types";
 
 const PARTY_COOKIE = "party_id";
@@ -11,7 +12,7 @@ async function loadParty(
   const { data: party } = await supabase
     .from("parties")
     .select(
-      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes",
+      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes, phone",
     )
     .eq("id", partyId)
     .maybeSingle();
@@ -104,11 +105,19 @@ export const actions: Actions = {
         ? String(formData.get("dietary_notes") ?? "").trim() || null
         : null;
 
+    const phoneResult = normalizePhone(formData.get("phone"));
+    if (!phoneResult.ok) {
+      return fail(400, { error: phoneResult.error });
+    }
+
     const { error } = await supabase
       .from("parties")
       .update({
         attending_count: attendingCount,
         dietary_notes: dietaryNotes,
+        // Kept even when attending_count is 0 — a regretting party's number
+        // is still worth having, unlike dietary notes.
+        phone: phoneResult.value,
         updated_at: new Date().toISOString(),
       })
       .eq("id", partyId);

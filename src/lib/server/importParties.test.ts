@@ -18,17 +18,19 @@ describe("parseImport", () => {
         displayName: "The Smiths",
         maxPartySize: 1,
         plusOnes: 0,
+        phone: null,
       });
     }
   });
 
-  it("accepts explicit display_name, max_party_size, and plus_ones", () => {
+  it("accepts explicit display_name, max_party_size, plus_ones, and phone", () => {
     const result = parseImport(
       JSON.stringify([
         partyFixture({
           display_name: "Kyle & Sara",
           max_party_size: 3,
           plus_ones: 1,
+          phone: "402-555-1234",
         }),
       ]),
     );
@@ -39,7 +41,24 @@ describe("parseImport", () => {
         displayName: "Kyle & Sara",
         maxPartySize: 3,
         plusOnes: 1,
+        phone: "+14025551234",
       });
+    }
+  });
+
+  it("rejects an unparseable phone", () => {
+    const result = parseImport(JSON.stringify([partyFixture({ phone: "123" })]));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors[0]).toMatch(/phone/);
+    }
+  });
+
+  it("rejects a non-string phone", () => {
+    const result = parseImport(JSON.stringify([partyFixture({ phone: 4025551234 })]));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors[0]).toMatch(/phone/);
     }
   });
 

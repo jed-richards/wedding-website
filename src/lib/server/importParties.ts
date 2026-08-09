@@ -2,16 +2,19 @@
  * any Supabase or request dependencies so the shape/validation rules are easy to
  * reason about (and test) in isolation from the form action that persists them. */
 
+import { normalizePhone } from "$lib/phone";
+
 /** One validated, trimmed party from an import file. The uploaded file uses
- * snake_case keys (`party_name`/`display_name`/`max_party_size`/`plus_ones`);
- * those are read at parse time and normalised into this camelCase domain
- * shape. `plusOnes` is how many of `maxPartySize`'s seats are unnamed
+ * snake_case keys (`party_name`/`display_name`/`max_party_size`/`plus_ones`/
+ * `phone`); those are read at parse time and normalised into this camelCase
+ * domain shape. `plusOnes` is how many of `maxPartySize`'s seats are unnamed
  * plus-ones; the rest are the named invitees implied by `displayName`. */
 export interface ImportParty {
   partyName: string;
   displayName: string;
   maxPartySize: number;
   plusOnes: number;
+  phone: string | null;
 }
 
 export type ParseResult =
@@ -126,8 +129,24 @@ export function parseImport(raw: string): ParseResult {
       }
     }
 
+    // phone is optional; blank/omitted is fine, present-but-unparseable is an
+    // error (same rules as the RSVP and admin forms).
+    let phone: string | null = null;
+    if (entry.phone !== undefined) {
+      if (typeof entry.phone !== "string") {
+        errors.push(`${label}: "phone" must be a string.`);
+      } else {
+        const phoneResult = normalizePhone(entry.phone);
+        if (!phoneResult.ok) {
+          errors.push(`${label}: ${phoneResult.error}`);
+        } else {
+          phone = phoneResult.value;
+        }
+      }
+    }
+
     if (partyName) {
-      parties.push({ partyName, displayName, maxPartySize, plusOnes });
+      parties.push({ partyName, displayName, maxPartySize, plusOnes, phone });
     }
   });
 

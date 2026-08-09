@@ -1,6 +1,7 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { createAuthClient, createServiceClient } from "$lib/server/supabase";
 import { getAdminSession, requireAdminEmail } from "$lib/server/auth";
+import { normalizePhone } from "$lib/phone";
 import {
   MAX_IMPORT_BYTES,
   MAX_PARTY_SIZE,
@@ -48,7 +49,7 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
     .from("parties")
     .select(
-      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes",
+      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes, phone",
     )
     .order("party_name");
 
@@ -58,6 +59,7 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
     attending: rows.reduce((sum, p) => sum + (p.attending_count ?? 0), 0),
     responded: rows.filter((p) => p.attending_count !== null).length,
     noResponse: rows.filter((p) => p.attending_count === null).length,
+    withPhone: rows.filter((p) => p.phone !== null).length,
   };
 
   return { parties: rows, summary };
@@ -119,6 +121,10 @@ export const actions: Actions = {
     if (!plusOnesResult.ok) {
       return fail(400, { error: plusOnesResult.error });
     }
+    const phoneResult = normalizePhone(formData.get("phone"));
+    if (!phoneResult.ok) {
+      return fail(400, { error: phoneResult.error });
+    }
 
     const supabase = createServiceClient(env);
     const { error } = await supabase.from("parties").insert({
@@ -126,6 +132,7 @@ export const actions: Actions = {
       display_name: displayName,
       max_party_size: sizeResult.value,
       plus_ones: plusOnesResult.value,
+      phone: phoneResult.value,
     });
     if (error) {
       if (error.code === "23505") {
@@ -161,6 +168,10 @@ export const actions: Actions = {
     if (!plusOnesResult.ok) {
       return fail(400, { error: plusOnesResult.error, partyId });
     }
+    const phoneResult = normalizePhone(formData.get("phone"));
+    if (!phoneResult.ok) {
+      return fail(400, { error: phoneResult.error, partyId });
+    }
 
     const supabase = createServiceClient(env);
     const { error } = await supabase
@@ -170,6 +181,7 @@ export const actions: Actions = {
         display_name: displayName,
         max_party_size: sizeResult.value,
         plus_ones: plusOnesResult.value,
+        phone: phoneResult.value,
       })
       .eq("id", partyId);
     if (error) {
@@ -258,6 +270,7 @@ export const actions: Actions = {
           display_name: p.displayName,
           max_party_size: p.maxPartySize,
           plus_ones: p.plusOnes,
+          phone: p.phone,
         })),
       )
       .select("id");
