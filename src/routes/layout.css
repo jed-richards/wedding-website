@@ -20,6 +20,12 @@
   --color-text: #3a3a34;
   --color-text-muted: #6b6b62;
 
+  /* RSVP status colors — used by the admin dashboard's seat ledger and party
+   * list to show response state at a glance. */
+  --color-attending: #7c8b6f;
+  --color-awaiting: #d8a7b1;
+  --color-declined: #b9b6ac;
+
   /* Typography — system stacks only, no webfont CDN dependency */
   --font-heading: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
