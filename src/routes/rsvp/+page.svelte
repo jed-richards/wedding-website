@@ -8,6 +8,80 @@
 
   let saved = $derived(form?.saved === true);
 
+  // --- Name gate combobox -------------------------------------------------
+
+  let query = $state("");
+  let suggestions = $state<string[]>([]);
+  let open = $state(false);
+  let activeIndex = $state(-1);
+  let picked = $state(false);
+  let continueButton: HTMLButtonElement | undefined = $state();
+
+  // Server-reported picks when a query matched more than one party (also
+  // shown to no-JS visitors via `form.suggestions`).
+  let serverSuggestions = $derived(form?.suggestions ?? []);
+
+  let requestSeq = 0;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  async function fetchSuggestions(q: string) {
+    const seq = ++requestSeq;
+    try {
+      const res = await fetch(`/rsvp/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok || seq !== requestSeq) return;
+      const body = (await res.json()) as { results: { display_name: string }[] };
+      if (seq !== requestSeq) return;
+      suggestions = body.results.map((r) => r.display_name);
+      activeIndex = -1;
+    } catch {
+      // Network hiccup — leave whatever suggestions are already showing.
+    }
+  }
+
+  function onInput() {
+    open = true;
+    picked = false;
+    clearTimeout(debounceTimer);
+    const q = query;
+    if (q.trim().length < 2) {
+      suggestions = [];
+      return;
+    }
+    debounceTimer = setTimeout(() => fetchSuggestions(q), 200);
+  }
+
+  // Picking a suggestion only fills the field and marks it confirmed — it
+  // does not submit. The guest still has to press Continue, so a mistaken
+  // click (e.g. a similarly-named party) doesn't silently RSVP the wrong
+  // household.
+  function selectName(name: string) {
+    query = name;
+    suggestions = [];
+    open = false;
+    activeIndex = -1;
+    picked = true;
+    continueButton?.focus();
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (!open || suggestions.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      activeIndex = (activeIndex + 1) % suggestions.length;
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      activeIndex = (activeIndex - 1 + suggestions.length) % suggestions.length;
+    } else if (event.key === "Enter") {
+      if (activeIndex >= 0) {
+        event.preventDefault();
+        selectName(suggestions[activeIndex]);
+      }
+    } else if (event.key === "Escape") {
+      open = false;
+      activeIndex = -1;
+    }
+  }
+
   function attendingCountOptions(maxPartySize: number) {
     return Array.from({ length: maxPartySize + 1 }, (_, count) => count);
   }
@@ -35,32 +109,100 @@
 
   {#if !data.session}
     <p class="mb-6 text-gray-600">
-      Enter your party name as shown on your invitation to RSVP.
+      Start typing your name and pick yourself from the list. The name from your
+      invitation works too.
     </p>
 
     <form method="POST" action="?/verify" use:enhance class="flex flex-col gap-4">
-      <label class="flex flex-col gap-1">
-        <span class="text-sm font-medium">Party name</span>
+      <div class="relative flex flex-col gap-1">
+        <label class="text-sm font-medium" for="party-name">Your name</label>
         <input
+          id="party-name"
           type="text"
           name="party_name"
           autocomplete="off"
           required
-          class="rounded-md border-gray-300"
+          role="combobox"
+          aria-expanded={open && suggestions.length > 0}
+          aria-controls="party-suggestions"
+          aria-activedescendant={activeIndex >= 0
+            ? `party-suggestion-${activeIndex}`
+            : undefined}
+          class="rounded-md border-gray-300 {picked
+            ? 'border-green-600 focus:border-green-600 focus:ring-green-600'
+            : ''}"
+          bind:value={query}
+          oninput={onInput}
+          onkeydown={onKeydown}
+          onfocus={() => (open = true)}
+          onblur={() => setTimeout(() => (open = false), 150)}
         />
-      </label>
+        {#if picked}
+          <p class="text-sm text-green-700">
+            ✓ Selected — press Continue below to confirm it's you.
+          </p>
+        {/if}
+        {#if open && suggestions.length > 0}
+          <ul
+            id="party-suggestions"
+            role="listbox"
+            class="absolute top-full z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-300 bg-white shadow-lg"
+          >
+            {#each suggestions as name, i (name)}
+              <!-- Combobox pattern: the input above owns all keyboard
+                   interaction via aria-activedescendant (see onKeydown);
+                   options are mouse/touch targets only, not independently
+                   focusable. -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <li
+                id={`party-suggestion-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+                class="cursor-pointer px-3 py-2 text-sm {i === activeIndex
+                  ? 'bg-gray-100'
+                  : ''}"
+                onmousedown={(e) => e.preventDefault()}
+                onclick={() => selectName(name)}
+              >
+                {name}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
 
       {#if form?.error}
         <p class="text-sm text-red-600">{form.error}</p>
       {/if}
 
+      {#if serverSuggestions.length > 0}
+        <ul class="flex flex-col gap-2">
+          {#each serverSuggestions as name (name)}
+            <li>
+              <button
+                type="button"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                onclick={() => selectName(name)}
+              >
+                {name}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
       <button
         type="submit"
+        bind:this={continueButton}
         class="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
       >
         Continue
       </button>
     </form>
+
+    <p class="mt-6 text-sm text-gray-500">
+      Still can't find yourself? Reach out to Kenadie or Jed and we'll get you sorted.
+    </p>
   {:else}
     <p class="mb-6 text-gray-600">
       {seatWording(data.session.party)}

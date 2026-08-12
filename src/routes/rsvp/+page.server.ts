@@ -1,5 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import { createServiceClient } from "$lib/server/supabase";
+import { loadPartyDirectory } from "$lib/server/partyDirectory";
+import { resolveParty } from "$lib/partySearch";
 import { normalizePhone } from "$lib/phone";
 import type { Actions, PageServerLoad } from "./$types";
 
@@ -38,24 +40,31 @@ export const actions: Actions = {
   verify: async ({ request, cookies, platform }) => {
     const formData = await request.formData();
     const partyName = String(formData.get("party_name") ?? "").trim();
+    const noSuggestions: string[] = [];
     if (!partyName) {
-      return fail(400, { error: "Enter your party name." });
+      return fail(400, { error: "Enter your party name.", suggestions: noSuggestions });
     }
 
     const supabase = createServiceClient(platform!.env);
-    const { data: party } = await supabase
-      .from("parties")
-      .select("id")
-      .ilike("party_name", partyName)
-      .maybeSingle();
+    const parties = await loadPartyDirectory(supabase);
+    const result = resolveParty(partyName, parties);
 
-    if (!party) {
+    if (result.kind === "none") {
       return fail(401, {
-        error: "We couldn't find that name. Please double-check and try again.",
+        error:
+          "We couldn't find that name. Try your first or last name, or the name on your invitation.",
+        suggestions: noSuggestions,
       });
     }
 
-    cookies.set(PARTY_COOKIE, party.id, {
+    if (result.kind === "ambiguous") {
+      return fail(400, {
+        error: "That matches more than one party — pick yours below.",
+        suggestions: result.matches.map((party) => party.display_name),
+      });
+    }
+
+    cookies.set(PARTY_COOKIE, result.party.id, {
       path: "/rsvp",
       httpOnly: true,
       sameSite: "lax",
