@@ -2,6 +2,7 @@ import { fail, redirect } from "@sveltejs/kit";
 import { createAuthClient, createServiceClient } from "$lib/server/supabase";
 import { getAdminSession, requireAdminEmail } from "$lib/server/auth";
 import { normalizePhone } from "$lib/phone";
+import { summarize } from "$lib/admin";
 import {
   MAX_IMPORT_BYTES,
   MAX_PARTY_SIZE,
@@ -49,20 +50,12 @@ async function loadDashboard(supabase: ReturnType<typeof createServiceClient>) {
   const { data: parties } = await supabase
     .from("parties")
     .select(
-      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes, phone",
+      "id, party_name, display_name, max_party_size, plus_ones, attending_count, dietary_notes, phone, updated_at, created_at",
     )
     .order("party_name");
 
   const rows = parties ?? [];
-  const summary = {
-    totalSeats: rows.reduce((sum, p) => sum + p.max_party_size, 0),
-    attending: rows.reduce((sum, p) => sum + (p.attending_count ?? 0), 0),
-    responded: rows.filter((p) => p.attending_count !== null).length,
-    noResponse: rows.filter((p) => p.attending_count === null).length,
-    withPhone: rows.filter((p) => p.phone !== null).length,
-  };
-
-  return { parties: rows, summary };
+  return { parties: rows, summary: summarize(rows) };
 }
 
 export const load: PageServerLoad = async ({ cookies, platform }) => {
