@@ -30,10 +30,13 @@
   };
 
   let statusLabel = $derived({
-    attending: `${party.attending_count} attending`,
-    declined: "Not attending",
-    awaiting: "Awaiting response",
+    attending: `${party.attending_count} of ${party.max_party_size} attending`,
+    declined: `Not attending (${party.max_party_size} reserved)`,
+    awaiting: `Awaiting response (${party.max_party_size} reserved)`,
   });
+
+  // Seats an attending party reserved but didn't RSVP a person into.
+  let unclaimed = $derived((party.attending_count ?? 0) < party.max_party_size);
 </script>
 
 <div class="flex gap-3 border-b border-neutral py-3">
@@ -45,7 +48,12 @@
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <p class="font-body text-sm font-medium text-text">{party.display_name}</p>
         <p class="font-body text-sm text-text-muted tabular-nums">
-          {statusLabel[status]} ({party.max_party_size} reserved)
+          {statusLabel[status]}
+          {#if status === "attending" && unclaimed}
+            <span class="text-primary">
+              · {party.max_party_size - (party.attending_count ?? 0)} unclaimed
+            </span>
+          {/if}
         </p>
         {#if party.phone}
           <p class="font-body text-sm text-text-muted">{formatPhone(party.phone)}</p>

@@ -31,9 +31,11 @@ export function partyStatus(party: Pick<PartyRow, "attending_count">): PartyStat
 export interface Summary {
   totalSeats: number;
   seatsAttending: number;
+  seatsUnclaimed: number;
   seatsDeclined: number;
   seatsAwaiting: number;
   partiesAttending: number;
+  partiesUnclaimed: number;
   partiesDeclined: number;
   partiesAwaiting: number;
   responded: number;
@@ -44,13 +46,18 @@ export interface Summary {
 }
 
 /** Aggregates the party list into the counts the dashboard's summary card and
- * seat ledger need. Seats are always counted against `max_party_size` (the
- * reserved seat count), regardless of RSVP status. */
+ * seat ledger need. Seats are counted against `max_party_size` (the reserved
+ * seat count), except for attending parties: a seat only counts as
+ * `seatsAttending` if a person actually claimed it (`attending_count`); the
+ * rest of that party's reservation counts as `seatsUnclaimed` — reserved,
+ * RSVP'd, but not coming. */
 export function summarize(parties: PartyRow[]): Summary {
   let seatsAttending = 0;
+  let seatsUnclaimed = 0;
   let seatsDeclined = 0;
   let seatsAwaiting = 0;
   let partiesAttending = 0;
+  let partiesUnclaimed = 0;
   let partiesDeclined = 0;
   let partiesAwaiting = 0;
   let withPhone = 0;
@@ -58,8 +65,12 @@ export function summarize(parties: PartyRow[]): Summary {
   for (const party of parties) {
     const status = partyStatus(party);
     if (status === "attending") {
-      seatsAttending += party.max_party_size;
+      const attending = party.attending_count ?? 0;
+      const unclaimed = party.max_party_size - attending;
+      seatsAttending += attending;
+      seatsUnclaimed += unclaimed;
       partiesAttending++;
+      if (unclaimed > 0) partiesUnclaimed++;
     } else if (status === "declined") {
       seatsDeclined += party.max_party_size;
       partiesDeclined++;
@@ -72,11 +83,13 @@ export function summarize(parties: PartyRow[]): Summary {
 
   const responded = partiesAttending + partiesDeclined;
   return {
-    totalSeats: seatsAttending + seatsDeclined + seatsAwaiting,
+    totalSeats: seatsAttending + seatsUnclaimed + seatsDeclined + seatsAwaiting,
     seatsAttending,
+    seatsUnclaimed,
     seatsDeclined,
     seatsAwaiting,
     partiesAttending,
+    partiesUnclaimed,
     partiesDeclined,
     partiesAwaiting,
     responded,

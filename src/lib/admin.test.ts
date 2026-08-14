@@ -39,7 +39,7 @@ describe("partyStatus", () => {
 });
 
 describe("summarize", () => {
-  it("sums seats by status against max_party_size, not attending_count", () => {
+  it("splits an attending party's reserved seats into claimed and unclaimed", () => {
     const parties = [
       party({ max_party_size: 4, attending_count: 2 }), // 2 didn't come, still reserved
       party({ max_party_size: 1, attending_count: 0 }),
@@ -47,14 +47,47 @@ describe("summarize", () => {
     ];
     const summary = summarize(parties);
     expect(summary.totalSeats).toBe(8);
-    expect(summary.seatsAttending).toBe(4);
+    expect(summary.seatsAttending).toBe(2);
+    expect(summary.seatsUnclaimed).toBe(2);
     expect(summary.seatsDeclined).toBe(1);
     expect(summary.seatsAwaiting).toBe(3);
     expect(summary.partiesAttending).toBe(1);
+    expect(summary.partiesUnclaimed).toBe(1);
     expect(summary.partiesDeclined).toBe(1);
     expect(summary.partiesAwaiting).toBe(1);
     expect(summary.responded).toBe(2);
     expect(summary.responseRate).toBeCloseTo(2 / 3);
+  });
+
+  it("counts an attending party at full capacity as zero unclaimed seats", () => {
+    const parties = [party({ max_party_size: 2, attending_count: 2 })];
+    const summary = summarize(parties);
+    expect(summary.seatsAttending).toBe(2);
+    expect(summary.seatsUnclaimed).toBe(0);
+    expect(summary.partiesUnclaimed).toBe(0);
+  });
+
+  it("puts all of a declined party's seats in seatsDeclined, none unclaimed", () => {
+    const parties = [party({ max_party_size: 3, attending_count: 0 })];
+    const summary = summarize(parties);
+    expect(summary.seatsDeclined).toBe(3);
+    expect(summary.seatsUnclaimed).toBe(0);
+  });
+
+  it("always sums the four seat buckets to totalSeats", () => {
+    const parties = [
+      party({ max_party_size: 4, attending_count: 2 }),
+      party({ max_party_size: 1, attending_count: 0 }),
+      party({ max_party_size: 3, attending_count: null }),
+      party({ max_party_size: 2, attending_count: 2 }),
+    ];
+    const summary = summarize(parties);
+    expect(
+      summary.seatsAttending +
+        summary.seatsUnclaimed +
+        summary.seatsDeclined +
+        summary.seatsAwaiting,
+    ).toBe(summary.totalSeats);
   });
 
   it("counts parties with a phone number", () => {
