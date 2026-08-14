@@ -11,11 +11,22 @@
     summary.totalSeats <= TICK_LIMIT
       ? [
           ...Array(summary.seatsAttending).fill("attending"),
+          ...Array(summary.seatsUnclaimed).fill("unclaimed"),
           ...Array(summary.seatsDeclined).fill("declined"),
           ...Array(summary.seatsAwaiting).fill("awaiting"),
         ]
       : [],
   );
+
+  // Unclaimed seats render hollow (sage outline, no fill) — reserved by an
+  // attending party but not claimed by anyone, distinct from a filled
+  // declined tick.
+  const tickClass: Record<string, string> = {
+    attending: "bg-attending",
+    unclaimed: "border border-attending bg-transparent",
+    declined: "bg-declined",
+    awaiting: "bg-awaiting",
+  };
 
   function pct(n: number) {
     return summary.totalSeats === 0 ? 0 : (n / summary.totalSeats) * 100;
@@ -33,13 +44,7 @@
   {#if ticks.length > 0}
     <div class="mt-4 flex flex-wrap gap-[3px]" role="img" aria-label="Seat ledger">
       {#each ticks as status, i (i)}
-        <span
-          class="h-3 w-2 rounded-[1px] {status === 'attending'
-            ? 'bg-attending'
-            : status === 'declined'
-              ? 'bg-declined'
-              : 'bg-awaiting'}"
-        ></span>
+        <span class="h-3 w-2 rounded-[1px] {tickClass[status]}"></span>
       {/each}
     </div>
   {:else}
@@ -49,6 +54,10 @@
       aria-label="Seat ledger"
     >
       <span class="h-full bg-attending" style="width: {pct(summary.seatsAttending)}%"
+      ></span>
+      <span
+        class="h-full border border-attending bg-transparent"
+        style="width: {pct(summary.seatsUnclaimed)}%"
       ></span>
       <span class="h-full bg-declined" style="width: {pct(summary.seatsDeclined)}%"
       ></span>
@@ -62,6 +71,11 @@
       <span class="size-2 rounded-full bg-attending"></span>
       {summary.seatsAttending} attending ({summary.partiesAttending}
       {summary.partiesAttending === 1 ? "party" : "parties"})
+    </li>
+    <li class="flex items-center gap-1.5">
+      <span class="size-2 rounded-full border border-attending"></span>
+      {summary.seatsUnclaimed} unclaimed ({summary.partiesUnclaimed}
+      {summary.partiesUnclaimed === 1 ? "party" : "parties"})
     </li>
     <li class="flex items-center gap-1.5">
       <span class="size-2 rounded-full bg-declined"></span>
