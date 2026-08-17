@@ -210,8 +210,7 @@
 
     {#if saved}
       <p class="mb-6 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">
-        Thanks! Your RSVP has been saved. You can come back and update it any time
-        before the deadline.
+        Thanks! Your RSVP has been saved.
       </p>
     {/if}
 
