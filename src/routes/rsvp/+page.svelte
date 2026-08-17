@@ -253,7 +253,7 @@
       </label>
       <p class="-mt-4 text-sm text-gray-500">
         We'll only use this to text you day-of details, like exactly where to enter and
-        park — no spam. The park entry fee is covered; just mention the
+        park. The park entry fee is covered; just mention the
         {PARK_ENTRY.weddingName} at the gate. See the
         <a href="/travel" class="text-gray-700 underline">Travel page</a> for details.
       </p>
