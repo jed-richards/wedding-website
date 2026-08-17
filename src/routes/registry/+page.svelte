@@ -55,10 +55,6 @@
       <h2 class="relative mt-1 font-heading text-2xl text-text sm:text-3xl">
         Our wedding registry
       </h2>
-      <p class="relative mt-2 max-w-md font-body text-sm text-text-muted">
-        Everything's in one place — gifts, home projects, and a fund or two — over on
-        Zola.
-      </p>
 
       <a
         href={REGISTRY_URL}
@@ -82,10 +78,6 @@
           />
         </svg>
       </a>
-
-      <p class="relative mt-4 font-body text-xs text-text-muted">
-        Gifts ship straight to us — no need to bring anything to the wedding.
-      </p>
     </div>
   </div>
 </section>
