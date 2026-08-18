@@ -141,7 +141,7 @@
     <p class="max-w-md text-center font-body text-sm text-text-muted">
       Leave a phone number on your
       <a href="/rsvp" class="text-primary hover:text-accent hover:underline">RSVP</a>
-      and we'll text the exact gate and parking details the day before.
+      and we'll text the exact gate and parking details the day of the wedding.
     </p>
   </div>
 
