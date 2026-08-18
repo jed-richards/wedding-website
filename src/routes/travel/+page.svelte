@@ -132,16 +132,19 @@
           <span class="font-medium text-text">{PARK_ENTRY.weddingName}</span>.
         </p>
         <p class="mt-3 font-body text-xs text-text-muted">
-          {PARK_ENTRY.inState} Nebraska plates &middot; {PARK_ENTRY.outOfState} out of state
-          &mdash; no permit needed in advance.
+          {PARK_ENTRY.inState} Nebraska plates &middot; {PARK_ENTRY.outOfState} out of state.
+        </p>
+        <p class="mt-1 font-body text-xs text-text-muted">
+          On the wedding day we'll cover the permits.
         </p>
       </div>
     </div>
 
     <p class="max-w-md text-center font-body text-sm text-text-muted">
-      Leave a phone number on your
+      Adding a phone number to your
       <a href="/rsvp" class="text-primary hover:text-accent hover:underline">RSVP</a>
-      and we'll text the exact gate and parking details the day of the wedding.
+      is optional. If you do, we'll text the exact gate and parking details the day of
+      the wedding.
     </p>
   </div>
 
